@@ -68,14 +68,14 @@ Esto es crítico porque el bot reporta información sobre gasto público real; u
 
 ## Equipo (Célula)
 
-| Rol                             | Responsabilidad                                                                  |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| Arquitecto de software          | Integridad, escalabilidad y gobernanza técnica de la arquitectura base           |
-| MLOps / DevSecOps Leader        | Pipeline CI/CD, SAST, validación de workflows n8n, observabilidad                |
-| Backend & IA Engineers (2)      | Flujos de n8n, integración con LLMs                                              |
-| Frontend & Data Interaction (2) | Microfrontend de consulta en lenguaje natural                                    |
-| QA & Prompt Engineer            | Pruebas de software y de prompts (consistencia, alucinaciones, prompt injection) |
-| Scrum Master                    | Eficiencia operativa y trazabilidad de tareas                                    |
+| Rol                             | Responsabilidad  |
+| ------------------------------- | ---------------- |
+| Arquitecto de software          | Samantha Lezma   |
+| MLOps / DevSecOps Leader        | Kevin Pasion     |
+| Backend & IA Engineers          | Diogo Canchari   |
+| Frontend & Data Interaction     | Yitzak Zamudio   |
+| QA & Prompt Engineer            | Alexander Marino |
+| Scrum Master                    | Alexandro Medina |
 
 ## Licencia
 
