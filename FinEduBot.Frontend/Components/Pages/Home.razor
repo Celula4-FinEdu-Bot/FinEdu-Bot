@@ -1,7 +1,207 @@
 ﻿@page "/"
+@page "/home"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>FinEdu-Bot</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="hero">
+    <div>
+        <span class="eyebrow">FINEDU-BOT</span>
 
-Welcome to your new app.
+        <h1>
+            Monitor de Transparencia
+            Económica y Gasto Público
+        </h1>
+
+        <p>
+            Consulta información presupuestaria del MEF
+            utilizando lenguaje natural.
+        </p>
+    </div>
+</div>
+
+<section class="nlq-container">
+    <div class="nlq-card">
+        <div class="nlq-header">
+            <div>
+                <span class="section-label">
+                    NATURAL LANGUAGE QUERY
+                </span>
+
+                <h2>
+                    ¿Qué deseas consultar?
+                </h2>
+            </div>
+
+            <span class="ai-badge">
+                MEF
+            </span>
+        </div>
+
+        <div class="nlq-search">
+            <input
+                @bind="query"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown"
+                placeholder="Ej. ¿Cuál fue la evolución del presupuesto en 2025?"
+                class="nlq-input" />
+
+            <button
+                class="primary-button"
+                @onclick="SearchAsync"
+                disabled="@loading">
+                @(loading ? "Consultando..." : "Consultar")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="error-message">
+                @error
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(result))
+        {
+            <div class="nlq-result">
+                <span class="result-label">
+                    RESULTADO
+                </span>
+
+                <p>
+                    @result
+                </p>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="feature-grid">
+
+    <a href="/presupuesto" class="feature-card">
+        <div class="feature-icon budget-icon">
+            $
+        </div>
+
+        <div>
+            <h3>
+                Evolución presupuestaria
+            </h3>
+
+            <p>
+                Consulta la evolución mensual del
+                presupuesto y ejecución.
+            </p>
+        </div>
+    </a>
+
+    <a href="/proyectos" class="feature-card">
+        <div class="feature-icon project-icon">
+            #
+        </div>
+
+        <div>
+            <h3>
+                Proyectos y categorías
+            </h3>
+
+            <p>
+                Identifica las categorías con mayor
+                presupuesto y ejecución.
+            </p>
+        </div>
+    </a>
+
+    <a href="/contrataciones" class="feature-card">
+        <div class="feature-icon contract-icon">
+            +
+        </div>
+
+        <div>
+            <h3>
+                Contrataciones
+            </h3>
+
+            <p>
+                Consulta el módulo de contrataciones
+                adjudicadas del OECE.
+            </p>
+        </div>
+    </a>
+
+</section>
+
+@code {
+
+    private string query = string.Empty;
+
+    private string result = string.Empty;
+
+    private string error = string.Empty;
+
+    private bool loading;
+
+    private async Task HandleKeyDown(
+        Microsoft.AspNetCore.Components.Web.KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        error = string.Empty;
+        result = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            error = "Escribe una consulta.";
+            return;
+        }
+
+        loading = true;
+
+        try
+        {
+            if (query.Contains(
+                    "proyecto",
+                    StringComparison.OrdinalIgnoreCase) ||
+                query.Contains(
+                    "categor",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                result =
+                    "Consulta detectada como análisis de proyectos o categorías. " +
+                    "Puedes revisar el resultado completo en Proyectos.";
+
+                return;
+            }
+
+            if (query.Contains(
+                    "presupuesto",
+                    StringComparison.OrdinalIgnoreCase) ||
+                query.Contains(
+                    "ejecución",
+                    StringComparison.OrdinalIgnoreCase) ||
+                query.Contains(
+                    "ejecucion",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                result =
+                    "Consulta detectada como análisis presupuestario. " +
+                    "Puedes revisar la evolución en Presupuesto.";
+
+                return;
+            }
+
+            error =
+                "No pude identificar la consulta. " +
+                "Prueba con presupuesto, ejecución, proyectos o categorías.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}
