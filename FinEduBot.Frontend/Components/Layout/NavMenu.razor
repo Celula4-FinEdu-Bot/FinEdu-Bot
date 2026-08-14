@@ -1,30 +1,86 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">FinEduBot.Frontend</a>
+﻿<div class="sidebar-brand">
+
+    <div class="brand-mark">
+        F
     </div>
+
+    <div>
+        <strong>
+            FinEdu-Bot
+        </strong>
+
+        <span>
+            Transparencia pública
+        </span>
+    </div>
+
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="nav-menu">
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+    <div class="nav-section">
+        CONSULTAS
+    </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+    <NavLink
+        href="/"
+        Match="NavLinkMatch.All"
+        class="nav-link">
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+        <span class="nav-icon">
+            ⌂
+        </span>
 
+        <span>
+            Inicio / NLQ
+        </span>
+
+    </NavLink>
+
+    <NavLink
+        href="/presupuesto"
+        class="nav-link">
+
+        <span class="nav-icon">
+            $
+        </span>
+
+        <span>
+            Presupuesto
+        </span>
+
+    </NavLink>
+
+    <NavLink
+        href="/proyectos"
+        class="nav-link">
+
+        <span class="nav-icon">
+            #
+        </span>
+
+        <span>
+            Proyectos
+        </span>
+
+    </NavLink>
+
+    <div class="nav-section">
+        CONTRATACIONES
+    </div>
+
+    <NavLink
+        href="/contrataciones"
+        class="nav-link">
+
+        <span class="nav-icon">
+            +
+        </span>
+
+        <span>
+            OECE
+        </span>
+
+    </NavLink>
+
+</nav>

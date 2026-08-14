@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\USUARIO\\Downloads\\FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj": {}
+    "C:\\Users\\USUARIO\\Downloads\\Caso_5FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\USUARIO\\Downloads\\FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj": {
+    "C:\\Users\\USUARIO\\Downloads\\Caso_5FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\USUARIO\\Downloads\\FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj",
+        "projectUniqueName": "C:\\Users\\USUARIO\\Downloads\\Caso_5FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj",
         "projectName": "FinEduBot.Frontend",
-        "projectPath": "C:\\Users\\USUARIO\\Downloads\\FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj",
+        "projectPath": "C:\\Users\\USUARIO\\Downloads\\Caso_5FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\FinEduBot.Frontend.csproj",
         "packagesPath": "C:\\Users\\USUARIO\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\USUARIO\\Downloads\\FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\obj\\",
+        "outputPath": "C:\\Users\\USUARIO\\Downloads\\Caso_5FinEduBot\\FinEdu-Bot\\FinEduBot.Frontend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\USUARIO\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -46,6 +46,22 @@
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[9.0.10, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.10, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[9.0.4, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",
