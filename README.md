@@ -8,8 +8,7 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
 
 ---
 
-## Arquitectura
-
+## Arquitectura Lezma
 - **Frontend:** microfrontend ligero, consulta en lenguaje natural (NLQ)
 - **Orquestación:** n8n self-hosted (Docker Compose) como backend/API central
 - **IA:** multi-modelo con failover automático (ej. OpenAI → Anthropic)
