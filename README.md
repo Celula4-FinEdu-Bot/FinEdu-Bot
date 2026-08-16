@@ -22,11 +22,26 @@ _(Diagrama de arquitectura completo: ver `/docs/arquitectura.drawio`)_
 ## Estructura del repositorio
 
 ```
-/frontend           → microfrontend (NLQ)
-/n8n-workflows       → flujos exportados (JSON)
-/connectors          → scrapers y conectores a portales open data
-/infra               → docker-compose, configuración de despliegue
-/docs                → diagramas y documentación técnica
+.github/
+├── PULL_REQUEST_TEMPLATE.md      # Formulario obligatorio para abrir PRs
+└── workflows/
+    ├── frontend-ci.yml           # Pipeline DevSecOps: Linter y Build de la interfaz
+    ├── n8n-validate-ci.yml       # Pipeline DevSecOps: Validador de JSONs de n8n
+    └── ai-testing-ci.yml         # Pipeline IA Ops: Pruebas unitarias de prompts y LLMs
+
+src/
+├── frontend/                     # Microfrontend (NLQ)
+├── n8n-workflows/                # Flujos exportados (JSON) - producción y templates
+├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
+└── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
+
+infrastructure/
+├── docker-compose.yml            # Levanta n8n, PostgreSQL y la app local
+└── .env.example                  # Plantilla de variables de entorno
+
+.gitignore
+LICENSE
+README.md
 ```
 
 ## Cómo correr el proyecto en local
