@@ -1,145 +1,157 @@
-using System.Text.RegularExpressions;
 using FinEduBot.Frontend.Models;
-using FinEduBot.Frontend.Services.Interfaces;
 
 namespace FinEduBot.Frontend.Services;
 
-public sealed class NlqService : INlqService
+public sealed class NlqService
 {
-    private readonly IMeFService _mefService;
+    private readonly MefService _mefService;
 
-    public NlqService(IMeFService mefService)
+    public NlqService(MefService mefService)
     {
         _mefService = mefService;
     }
 
-    public async Task<NlqResponse> ProcessAsync(
-        NlqRequest request,
+    public async Task<NlqResponse> ProcesarAsync(
+        string pregunta,
         CancellationToken cancellationToken = default)
     {
-        var query =
-            request.Query
-                .Trim()
-                .ToLowerInvariant();
-
-        if (string.IsNullOrWhiteSpace(query))
+        if (string.IsNullOrWhiteSpace(pregunta))
         {
             return new NlqResponse
             {
-                Query = request.Query,
-                Intent = "unknown",
-                Message = "Escribe una consulta."
+                Success = false,
+                Message = "Escribe una consulta. Ejemplo: ¿Cuál fue la evolución del presupuesto entre 2012 y 2016?"
             };
         }
 
-        var year = ExtractYear(query);
+        var texto = pregunta.Trim().ToLowerInvariant();
 
-        if (IsProjectQuery(query))
+        if (ContieneAlguno(texto, "evolución",         
+        "evolucion del presupuesto",
+                "presupuesto por año",
+                "presupuesto anual",
+                "ejecución por año",
+                "ejecucion por año"))
+    {
+        var entidad = ExtraerEntidad(texto);
+        var datos = await _mefService.ObtenerEvolucionAsync(entidad, cancellationToken);
+        
+        // Convertir a PresupuestoResumen
+        var resumen = _mefService.ConvertirEvolucionAResumen(datos);
+
+        return new NlqResponse
         {
-            var projects =
-                await _mefService
-                    .ObtenerProyectosAsync(
-                        year,
-                        cancellationToken);
+            Success = true,
+            Intent = "EvolucionPresupuesto",
+            Message = "...",
+            Presupuestos = resumen  // Usa la propiedad Presupuestos en lugar de Evolucion
+        };
+    }
 
+        if (ContieneAlguno(
+                texto,
+                "proyectos",
+                "proyecto",
+                "categorías",
+                "categorias",
+                "mayor presupuesto",
+                "mayor ejecución",
+                "mayor ejecucion"))
+        {
             return new NlqResponse
             {
-                Query = request.Query,
-                Intent = "proyectos",
+                Success = true,
+                Intent = "Proyectos",
                 Message =
-                    "Estas son las categorías y proyectos con mayor ejecución.",
-                Proyectos = projects
+                    "La consulta corresponde al análisis de proyectos y categorías presupuestarias."
             };
         }
 
-        if (IsBudgetQuery(query))
+        if (ContieneAlguno(
+                texto,
+                "contrataciones",
+                "contratos",
+                "licitaciones",
+                "oece"))
         {
-            var budget =
-                await _mefService
-                    .ObtenerEvolucionMensualAsync(
-                        year,
-                        cancellationToken);
-
             return new NlqResponse
             {
-                Query = request.Query,
-                Intent = "presupuesto",
+                Success = true,
+                Intent = "Contrataciones",
                 Message =
-                    "Esta es la evolución mensual del presupuesto.",
-                PresupuestoMensual = budget
+                    "Esta consulta debe ser atendida por el microfrontend OECE."
             };
         }
 
         return new NlqResponse
         {
-            Query = request.Query,
-            Intent = "unknown",
+            Success = false,
+            Intent = "NoReconocido",
             Message =
-                "No pude identificar la consulta. " +
-                "Puedes preguntar por presupuesto, " +
-                "ejecución, categorías o proyectos."
+                "No pude identificar la consulta. Prueba con: " +
+                "\"¿Cuál fue la evolución del presupuesto entre 2012 y 2016?\""
         };
     }
 
-    private static bool IsBudgetQuery(
-        string query)
+    private static bool ContieneAlguno(
+        string texto,
+        params string[] valores)
     {
-        return ContainsAny(
-            query,
-            "presupuesto",
-            "evolución",
-            "evolucion",
-            "mensual",
-            "mes",
-            "gasto",
-            "ejecución mensual",
-            "ejecucion mensual");
+        return valores.Any(texto.Contains);
     }
 
-    private static bool IsProjectQuery(
-        string query)
+    private static string? ExtraerEntidad(string texto)
     {
-        return ContainsAny(
-            query,
-            "proyecto",
-            "proyectos",
-            "categoría",
-            "categorias",
-            "categorías",
-            "mayor ejecución",
-            "mayor ejecucion",
-            "más ejecución",
-            "mas ejecucion");
-    }
+        var marcadores = new[] { 
+            "municipalidad ", 
+            "entidad ",
+            "ejecutora ",
+            "pliego "
+        };
 
-    private static bool ContainsAny(
-        string value,
-        params string[] terms)
-    {
-        return terms.Any(
-            value.Contains);
-    }
-
-    private static int? ExtractYear(
-        string query)
-    {
-        var match =
-            Regex.Match(
-                query,
-                @"\b(20\d{2})\b");
-
-        if (!match.Success)
+        foreach (var marcador in marcadores)
         {
-            return null;
+            var index = texto.IndexOf(
+                marcador,
+                StringComparison.OrdinalIgnoreCase);
+
+            if (index >= 0)
+            {
+                var entidad = texto[(index + marcador.Length)..];
+                
+                // Buscar hasta el final de la frase
+                var endIndex = entidad.IndexOfAny(new[] { '.', '?', ';', ',' });
+                if (endIndex > 0)
+                {
+                    entidad = entidad[..endIndex];
+                }
+
+                return string.IsNullOrWhiteSpace(entidad) 
+                    ? null 
+                    : entidad.Trim();
+            }
         }
 
-        if (int.TryParse(
-            match.Value,
-            out var year))
+        // Si no encuentra marcador, intenta extraer palabras clave
+        var palabras = texto.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var palabra in palabras)
         {
-            return year;
+            if (palabra.Length > 3 && !EsPalabraComun(palabra))
+            {
+                return palabra.Trim('.', '?', ',', ';');
+            }
         }
 
         return null;
+    }
+
+    private static bool EsPalabraComun(string palabra)
+    {
+        var comunes = new[] { 
+            "evolución", "evolucion", "presupuesto", "año", "años", "cual", "cuál",
+            "fue", "son", "los", "las", "del", "de", "el", "la", "por", "para",
+            "entre", "desde", "hasta", "municipal", "entidad", "pliego"
+        };
+        return comunes.Contains(palabra.ToLowerInvariant());
     }
 }

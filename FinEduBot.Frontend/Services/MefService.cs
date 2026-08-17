@@ -1,510 +1,312 @@
-using System.Globalization;
-using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using FinEduBot.Frontend.Models;
-using FinEduBot.Frontend.Services.Interfaces;
 
 namespace FinEduBot.Frontend.Services;
 
-public sealed class MefService : IMeFService
+public sealed class MefService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<MefService> _logger;
+    private readonly HttpClient _httpClient;
 
-    private static readonly string[] AnioFields =
-    [
-        "ANIO",
-        "AÑO",
-        "YEAR",
-        "ANO"
-    ];
+    private const string BaseUrl =
+        "https://api.datosabiertos.mef.gob.pe/DatosAbiertos/v1/";
+    
+    // Resource ID del dataset de comparativo de gasto
+    private const string ResourceId = "5f3b3cbe-3955-41cc-8662-1757ebb5cf53";
 
-    private static readonly string[] MesFields =
-    [
-        "MES",
-        "MONTH",
-        "MES_NOMBRE"
-    ];
-
-    private static readonly string[] PresupuestoFields =
-    [
-        "PIM",
-        "PIA",
-        "PRESUPUESTO",
-        "MONTO_PIM",
-        "MONTO_PIA",
-        "PRESUPUESTO_INSTITUCIONAL_MODIFICADO"
-    ];
-
-    private static readonly string[] EjecutadoFields =
-    [
-        "DEVENGADO",
-        "EJECUTADO",
-        "EJECUCION",
-        "MONTO_DEVENGADO",
-        "DEVENGADO_ACUMULADO"
-    ];
-
-    private static readonly string[] CategoriaFields =
-    [
-        "CATEGORIA",
-        "CATEGORIA_GASTO",
-        "GENERICA_NOMBRE",
-        "GENERICA",
-        "TIPO_GASTO",
-        "PRODUCTO_NOMBRE",
-        "PROGRAMA_PRESUPUESTAL"
-    ];
-
-    private static readonly string[] ProyectoFields =
-    [
-        "PROYECTO",
-        "PROYECTO_NOMBRE",
-        "NOMBRE_PROYECTO",
-        "ACTIVIDAD_NOMBRE",
-        "PRODUCTO_NOMBRE"
-    ];
-
-    public MefService(
-        IHttpClientFactory httpClientFactory,
-        IConfiguration configuration,
-        ILogger<MefService> logger)
+    public MefService(HttpClient httpClient)
     {
-        _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
-        _logger = logger;
+        _httpClient = httpClient;
     }
 
-    public async Task<int> ObtenerTotalRegistrosAsync(
+    public async Task<MefDataResponse?> SearchAsync(
+        string resourceId,
+        string? query = null,
+        int limit = 20,
         CancellationToken cancellationToken = default)
     {
-        var response = await GetDataAsync(
-            limit: 1,
-            offset: 0,
-            cancellationToken);
-
-        return response.Result.Total;
-    }
-
-    public async Task<IReadOnlyList<PresupuestoMensualDto>>
-        ObtenerEvolucionMensualAsync(
-            int? anio = null,
-            CancellationToken cancellationToken = default)
-    {
-        var response = await GetDataAsync(
-            limit: 1000,
-            offset: 0,
-            cancellationToken);
-
-        var grouped = new Dictionary<(int Anio, int Mes), PresupuestoMensualDto>();
-
-        foreach (var record in response.Result.Records)
+        var parameters = new List<string>
         {
-            var row = NormalizeRecord(record);
+            $"resource_id={Uri.EscapeDataString(resourceId)}",
+            $"limit={limit}"
+        };
 
-            var rowAnio = GetInt(row, AnioFields);
-
-            if (anio.HasValue && rowAnio != anio.Value)
-            {
-                continue;
-            }
-
-            if (rowAnio <= 0)
-            {
-                continue;
-            }
-
-            var mes = GetMonth(row);
-
-            if (mes <= 0 || mes > 12)
-            {
-                continue;
-            }
-
-            var presupuesto =
-                GetDecimal(row, PresupuestoFields);
-
-            var ejecutado =
-                GetDecimal(row, EjecutadoFields);
-
-            var key = (rowAnio, mes);
-
-            if (!grouped.TryGetValue(key, out var current))
-            {
-                current = new PresupuestoMensualDto
-                {
-                    Anio = rowAnio,
-                    Mes = mes,
-                    NombreMes = CultureInfo
-                        .GetCultureInfo("es-PE")
-                        .DateTimeFormat
-                        .GetMonthName(mes),
-
-                    Presupuesto = 0,
-                    Ejecutado = 0
-                };
-
-                grouped[key] = current;
-            }
-
-            current.Presupuesto += presupuesto;
-            current.Ejecutado += ejecutado;
-        }
-
-        return grouped
-            .Values
-            .OrderBy(x => x.Anio)
-            .ThenBy(x => x.Mes)
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<ProyectoPresupuestoDto>>
-        ObtenerProyectosAsync(
-            int? anio = null,
-            CancellationToken cancellationToken = default)
-    {
-        var response = await GetDataAsync(
-            limit: 1000,
-            offset: 0,
-            cancellationToken);
-
-        var grouped =
-            new Dictionary<string, ProyectoPresupuestoDto>(
-                StringComparer.OrdinalIgnoreCase);
-
-        foreach (var record in response.Result.Records)
+        if (!string.IsNullOrWhiteSpace(query))
         {
-            var row = NormalizeRecord(record);
-
-            var rowAnio = GetInt(row, AnioFields);
-
-            if (anio.HasValue &&
-                rowAnio != 0 &&
-                rowAnio != anio.Value)
-            {
-                continue;
-            }
-
-            var categoria =
-                GetString(row, CategoriaFields);
-
-            var proyecto =
-                GetString(row, ProyectoFields);
-
-            if (string.IsNullOrWhiteSpace(categoria))
-            {
-                categoria = "Sin categoría";
-            }
-
-            if (string.IsNullOrWhiteSpace(proyecto))
-            {
-                proyecto = "Sin proyecto";
-            }
-
-            var presupuesto =
-                GetDecimal(row, PresupuestoFields);
-
-            var ejecutado =
-                GetDecimal(row, EjecutadoFields);
-
-            var key =
-                $"{categoria}|{proyecto}";
-
-            if (!grouped.TryGetValue(key, out var current))
-            {
-                current = new ProyectoPresupuestoDto
-                {
-                    Categoria = categoria,
-                    Proyecto = proyecto
-                };
-
-                grouped[key] = current;
-            }
-
-            current.Presupuesto += presupuesto;
-            current.Ejecutado += ejecutado;
-        }
-
-        return grouped
-            .Values
-            .Where(x =>
-                x.Presupuesto > 0 ||
-                x.Ejecutado > 0)
-            .OrderByDescending(x => x.Ejecutado)
-            .Take(20)
-            .ToList();
-    }
-
-    private async Task<MefDataResponse> GetDataAsync(
-        int limit,
-        int offset,
-        CancellationToken cancellationToken)
-    {
-        var client =
-            _httpClientFactory.CreateClient("Mef");
-
-        var resourceId =
-            _configuration["Mef:ResourceId"];
-
-        if (string.IsNullOrWhiteSpace(resourceId))
-        {
-            throw new InvalidOperationException(
-                "Mef:ResourceId no está configurado.");
+            parameters.Add(
+                $"q={Uri.EscapeDataString(query)}");
         }
 
         var url =
-            $"datastore_search" +
-            $"?resource_id={Uri.EscapeDataString(resourceId)}" +
-            $"&limit={limit}" +
-            $"&offset={offset}";
+            $"{BaseUrl}datastore_search?{string.Join("&", parameters)}";
 
-        _logger.LogInformation(
-            "Consultando MEF. ResourceId={ResourceId}, Limit={Limit}, Offset={Offset}",
-            resourceId,
-            limit,
-            offset);
+        return await _httpClient.GetFromJsonAsync<MefDataResponse>(
+            url,
+            cancellationToken);
+    }
 
-        using var response =
-            await client.GetAsync(
-                url,
-                cancellationToken);
+    public async Task<MefDataResponse?> ExecuteSqlAsync(
+        string sql,
+        CancellationToken cancellationToken = default)
+    {
+        var url =
+            $"{BaseUrl}datastore_search_sql?sql={Uri.EscapeDataString(sql)}";
 
-        var body =
-            await response.Content.ReadAsStringAsync(
-                cancellationToken);
+        return await _httpClient.GetFromJsonAsync<MefDataResponse>(
+            url,
+            cancellationToken);
+    }
 
-        if (!response.IsSuccessStatusCode)
+    // Método de conversión de EvolucionPresupuesto a PresupuestoResumen
+    public List<PresupuestoResumen> ConvertirEvolucionAResumen(List<EvolucionPresupuesto> evolucion)
+{
+    return evolucion.Select(e => new PresupuestoResumen
+    {
+        Anio = e.Anio,
+        Mes = "Anual",  // Como son datos anuales
+        PIA = e.PresupuestoInicial,
+        PIM = e.PresupuestoModificado,
+        Ejecutado = e.MontoEjecutado,
+        PorcentajeEjecucion = e.PorcentajeEjecucion
+    }).ToList();
+}
+
+    // NUEVO MÉTODO: Obtener evolución del presupuesto
+    public async Task<List<EvolucionPresupuesto>> ObtenerEvolucionAsync(
+        string? entidad,
+        CancellationToken cancellationToken = default)
+    {
+        try
         {
-            _logger.LogError(
-                "MEF respondió HTTP {StatusCode}: {Body}",
-                response.StatusCode,
-                body);
+            // Primero intentamos obtener datos con SQL
+            var sql = $@"
+                SELECT 
+                    KEY_VALUE,
+                    EJECUTORA_NOMBRE,
+                    NIVEL_GOBIERNO_NOMBRE,
+                    DEPARTAMENTO_EJECUTORA_NOMBRE,
+                    PROVINCIA_EJECUTORA_NOMBRE,
+                    DISTRITO_EJECUTORA_NOMBRE,
+                    MONTO_PIA_2012,
+                    MONTO_PIM_2012,
+                    MONTO_DEVENGADO_2012,
+                    MONTO_PIA_2013,
+                    MONTO_PIM_2013,
+                    MONTO_DEVENGADO_2013,
+                    MONTO_PIA_2014,
+                    MONTO_PIM_2014,
+                    MONTO_DEVENGADO_2014,
+                    MONTO_PIA_2015,
+                    MONTO_PIM_2015,
+                    MONTO_DEVENGADO_2015,
+                    MONTO_PIA_2016,
+                    MONTO_PIM_2016,
+                    MONTO_DEVENGADO_2016
+                FROM 
+                    ""{ResourceId}""
+                WHERE 
+                    1=1";
 
-            throw new HttpRequestException(
-                $"MEF respondió HTTP {(int)response.StatusCode} " +
-                $"({response.StatusCode}).");
-        }
+            // Agregar filtro por entidad si se proporciona
+            if (!string.IsNullOrWhiteSpace(entidad))
+            {
+                sql += $" AND LOWER(EJECUTORA_NOMBRE) LIKE LOWER('%{entidad}%')";
+            }
 
-        var result =
-            JsonSerializer.Deserialize<MefDataResponse>(
-                body,
-                new JsonSerializerOptions
+            sql += " LIMIT 1000";
+
+            var response = await ExecuteSqlAsync(sql, cancellationToken);
+            
+            var result = new List<EvolucionPresupuesto>();
+
+            // Verificar que la respuesta sea exitosa y tenga registros
+            if (response?.Success == true && response.Result?.Records != null)
+            {
+                // Agrupar por año y sumar montos
+                var evolucionPorAnio = new Dictionary<int, EvolucionPresupuesto>();
+
+                foreach (var record in response.Result.Records)
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    // Procesar años 2012-2016
+                    for (int anio = 2012; anio <= 2016; anio++)
+                    {
+                        if (!evolucionPorAnio.ContainsKey(anio))
+                        {
+                            evolucionPorAnio[anio] = new EvolucionPresupuesto
+                            {
+                                Anio = anio,
+                                Entidad = entidad ?? "Todas las entidades"
+                            };
+                        }
 
-        if (result is null)
-        {
-            throw new InvalidOperationException(
-                "No fue posible interpretar la respuesta del MEF.");
-        }
+                        // Obtener valores para el año actual
+                        var piaKey = $"MONTO_PIA_{anio}";
+                        var pimKey = $"MONTO_PIM_{anio}";
+                        var devengadoKey = $"MONTO_DEVENGADO_{anio}";
 
-        if (!result.Success)
-        {
-            throw new InvalidOperationException(
-                "La API del MEF indicó que la consulta no fue exitosa.");
-        }
+                        // Extraer montos del record
+                        var pia = ObtenerDecimalDeRecord(record, piaKey);
+                        var pim = ObtenerDecimalDeRecord(record, pimKey);
+                        var devengado = ObtenerDecimalDeRecord(record, devengadoKey);
 
-        return result;
-    }
+                        // Acumular montos
+                        evolucionPorAnio[anio].PresupuestoInicial += pia;
+                        evolucionPorAnio[anio].PresupuestoModificado += pim;
+                        evolucionPorAnio[anio].MontoEjecutado += devengado;
+                    }
+                }
 
-    private static Dictionary<string, JsonElement>
-        NormalizeRecord(
-            Dictionary<string, JsonElement> record)
-    {
-        return record.ToDictionary(
-            pair => NormalizeKey(pair.Key),
-            pair => pair.Value,
-            StringComparer.OrdinalIgnoreCase);
-    }
+                result = evolucionPorAnio.Values
+                    .OrderBy(x => x.Anio)
+                    .ToList();
 
-    private static string NormalizeKey(
-        string key)
-    {
-        return key
-            .Trim()
-            .ToUpperInvariant()
-            .Replace(" ", "_")
-            .Replace("-", "_");
-    }
-
-    private static string GetString(
-        Dictionary<string, JsonElement> row,
-        IEnumerable<string> fields)
-    {
-        foreach (var field in fields)
-        {
-            var key = NormalizeKey(field);
-
-            if (!row.TryGetValue(key, out var value))
-            {
-                continue;
-            }
-
-            var result =
-                JsonElementToString(value);
-
-            if (!string.IsNullOrWhiteSpace(result))
-            {
-                return result;
-            }
-        }
-
-        return string.Empty;
-    }
-
-    private static int GetInt(
-        Dictionary<string, JsonElement> row,
-        IEnumerable<string> fields)
-    {
-        var value =
-            GetString(row, fields);
-
-        if (int.TryParse(
-            value,
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out var result))
-        {
-            return result;
-        }
-
-        if (decimal.TryParse(
-            value,
-            NumberStyles.Any,
-            CultureInfo.InvariantCulture,
-            out var decimalResult))
-        {
-            return (int)decimalResult;
-        }
-
-        return 0;
-    }
-
-    private static decimal GetDecimal(
-        Dictionary<string, JsonElement> row,
-        IEnumerable<string> fields)
-    {
-        foreach (var field in fields)
-        {
-            var key = NormalizeKey(field);
-
-            if (!row.TryGetValue(key, out var value))
-            {
-                continue;
-            }
-
-            var text =
-                JsonElementToString(value);
-
-            if (TryParseDecimal(text, out var result))
-            {
-                return result;
-            }
-        }
-
-        return 0;
-    }
-
-    private static bool TryParseDecimal(
-        string value,
-        out decimal result)
-    {
-        value = value.Trim();
-
-        if (decimal.TryParse(
-            value,
-            NumberStyles.Any,
-            CultureInfo.InvariantCulture,
-            out result))
-        {
-            return true;
-        }
-
-        if (decimal.TryParse(
-            value,
-            NumberStyles.Any,
-            new CultureInfo("es-PE"),
-            out result))
-        {
-            return true;
-        }
-
-        result = 0;
-        return false;
-    }
-
-    private static int GetMonth(
-        Dictionary<string, JsonElement> row)
-    {
-        foreach (var field in MesFields)
-        {
-            var key = NormalizeKey(field);
-
-            if (!row.TryGetValue(key, out var value))
-            {
-                continue;
-            }
-
-            var text =
-                JsonElementToString(value)
-                    .Trim()
-                    .ToLowerInvariant();
-
-            if (int.TryParse(
-                text,
-                out var numericMonth) &&
-                numericMonth >= 1 &&
-                numericMonth <= 12)
-            {
-                return numericMonth;
-            }
-
-            var months =
-                CultureInfo.GetCultureInfo("es-PE")
-                    .DateTimeFormat
-                    .MonthNames;
-
-            for (var index = 0;
-                 index < 12;
-                 index++)
-            {
-                if (months[index]
-                    .StartsWith(
-                        text,
-                        StringComparison.OrdinalIgnoreCase))
+                // Calcular porcentajes de ejecución para cada año
+                foreach (var item in result)
                 {
-                    return index + 1;
+                    item.PorcentajeEjecucion = item.PresupuestoModificado > 0
+                        ? Math.Round((item.MontoEjecutado / item.PresupuestoModificado) * 100, 2)
+                        : 0m;
                 }
             }
-        }
 
-        return 0;
+            return result;
+        }
+        catch (Exception ex)
+        {
+            // Log del error
+            Console.WriteLine($"Error al obtener evolución: {ex.Message}");
+            return new List<EvolucionPresupuesto>();
+        }
     }
 
-    private static string JsonElementToString(
-        JsonElement value)
+    // Método alternativo usando SearchAsync
+    public async Task<List<MefRecord>> ObtenerRegistrosPorEntidadAsync(
+        string? entidad,
+        int limit = 1000,
+        CancellationToken cancellationToken = default)
     {
-        return value.ValueKind switch
+        try
         {
-            JsonValueKind.String =>
-                value.GetString() ?? string.Empty,
+            var query = !string.IsNullOrWhiteSpace(entidad)
+                ? $"EJECUTORA_NOMBRE:{entidad}"
+                : null;
 
-            JsonValueKind.Number =>
-                value.ToString(),
+            var response = await SearchAsync(ResourceId, query, limit, cancellationToken);
 
-            JsonValueKind.True =>
-                "true",
+            var records = new List<MefRecord>();
 
-            JsonValueKind.False =>
-                "false",
+            if (response?.Success == true && response.Result?.Records != null)
+            {
+                foreach (var record in response.Result.Records)
+                {
+                    var mefRecord = new MefRecord();
+                    
+                    // Mapear propiedades del diccionario al objeto MefRecord
+                    MapearPropiedad(record, "KEY_VALUE", v => mefRecord.KeyValue = v?.ToString());
+                    MapearPropiedad(record, "EJECUTORA_NOMBRE", v => mefRecord.EjecutoraNombre = v?.ToString());
+                    MapearPropiedad(record, "DEPARTAMENTO_EJECUTORA_NOMBRE", v => mefRecord.DepartamentoEjecutoraNombre = v?.ToString());
+                    MapearPropiedad(record, "PROVINCIA_EJECUTORA_NOMBRE", v => mefRecord.ProvinciaEjecutoraNombre = v?.ToString());
+                    MapearPropiedad(record, "DISTRITO_EJECUTORA_NOMBRE", v => mefRecord.DistritoEjecutoraNombre = v?.ToString());
+                    
+                    // Mapear montos para cada año
+                    for (int anio = 2012; anio <= 2016; anio++)
+                    {
+                        var piaKey = $"MONTO_PIA_{anio}";
+                        var pimKey = $"MONTO_PIM_{anio}";
+                        var devengadoKey = $"MONTO_DEVENGADO_{anio}";
+                        var giradoKey = $"MONTO_GIRADO_{anio}";
+                        var certificadoKey = $"MONTO_CERTIFICADO_{anio}";
+                        var comprometidoKey = $"MONTO_COMPROMETIDO_{anio}";
 
-            JsonValueKind.Null =>
-                string.Empty,
+                        MapearPropiedad(record, piaKey, v => AsignarValorMefRecord(anio, "Pia", mefRecord, v));
+                        MapearPropiedad(record, pimKey, v => AsignarValorMefRecord(anio, "Pim", mefRecord, v));
+                        MapearPropiedad(record, devengadoKey, v => AsignarValorMefRecord(anio, "Devengado", mefRecord, v));
+                        MapearPropiedad(record, giradoKey, v => AsignarValorMefRecord(anio, "Girado", mefRecord, v));
+                        MapearPropiedad(record, certificadoKey, v => AsignarValorMefRecord(anio, "Certificado", mefRecord, v));
+                        MapearPropiedad(record, comprometidoKey, v => AsignarValorMefRecord(anio, "Comprometido", mefRecord, v));
+                    }
 
-            _ =>
-                value.ToString()
-        };
+                    records.Add(mefRecord);
+                }
+            }
+
+            return records;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al obtener registros: {ex.Message}");
+            return new List<MefRecord>();
+        }
+    }
+
+    // Método auxiliar para obtener decimal de un record
+    private decimal ObtenerDecimalDeRecord(Dictionary<string, JsonElement> record, string key)
+    {
+        if (record.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null)
+        {
+            if (decimal.TryParse(value.ToString(), out var result))
+                return result;
+        }
+        return 0m;
+    }
+
+    private void MapearPropiedad(Dictionary<string, JsonElement> record, string key, Action<JsonElement?> setter)
+    {
+        if (record.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null)
+        {
+            setter(value);
+        }
+    }
+
+    private void AsignarValorMefRecord(int anio, string propiedad, MefRecord record, JsonElement? valor)
+    {
+        if (!valor.HasValue || valor.Value.ValueKind == JsonValueKind.Null)
+            return;
+
+        var monto = decimal.TryParse(valor.Value.ToString(), out var result) ? result : 0m;
+        
+        switch (anio)
+        {
+            case 2012:
+                if (propiedad == "Pia") record.Pia2012 = monto;
+                else if (propiedad == "Pim") record.Pim2012 = monto;
+                else if (propiedad == "Devengado") record.Devengado2012 = monto;
+                else if (propiedad == "Girado") record.Girado2012 = monto;
+                else if (propiedad == "Certificado") record.Certificado2012 = monto;
+                else if (propiedad == "Comprometido") record.Comprometido2012 = monto;
+                break;
+            case 2013:
+                if (propiedad == "Pia") record.Pia2013 = monto;
+                else if (propiedad == "Pim") record.Pim2013 = monto;
+                else if (propiedad == "Devengado") record.Devengado2013 = monto;
+                else if (propiedad == "Girado") record.Girado2013 = monto;
+                else if (propiedad == "Certificado") record.Certificado2013 = monto;
+                else if (propiedad == "Comprometido") record.Comprometido2013 = monto;
+                break;
+            case 2014:
+                if (propiedad == "Pia") record.Pia2014 = monto;
+                else if (propiedad == "Pim") record.Pim2014 = monto;
+                else if (propiedad == "Devengado") record.Devengado2014 = monto;
+                else if (propiedad == "Girado") record.Girado2014 = monto;
+                else if (propiedad == "Certificado") record.Certificado2014 = monto;
+                else if (propiedad == "Comprometido") record.Comprometido2014 = monto;
+                break;
+            case 2015:
+                if (propiedad == "Pia") record.Pia2015 = monto;
+                else if (propiedad == "Pim") record.Pim2015 = monto;
+                else if (propiedad == "Devengado") record.Devengado2015 = monto;
+                else if (propiedad == "Girado") record.Girado2015 = monto;
+                else if (propiedad == "Certificado") record.Certificado2015 = monto;
+                else if (propiedad == "Comprometido") record.Comprometido2015 = monto;
+                break;
+            case 2016:
+                if (propiedad == "Pia") record.Pia2016 = monto;
+                else if (propiedad == "Pim") record.Pim2016 = monto;
+                else if (propiedad == "Devengado") record.Devengado2016 = monto;
+                else if (propiedad == "Girado") record.Girado2016 = monto;
+                else if (propiedad == "Certificado") record.Certificado2016 = monto;
+                else if (propiedad == "Comprometido") record.Comprometido2016 = monto;
+                break;
+        }
     }
 }

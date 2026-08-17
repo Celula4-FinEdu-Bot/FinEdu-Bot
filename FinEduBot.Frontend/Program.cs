@@ -1,42 +1,38 @@
 using FinEduBot.Frontend.Components;
-using FinEduBot.Frontend.Data;
-using Microsoft.EntityFrameworkCore;
+using FinEduBot.Frontend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException(
-        "No se encontró la cadena de conexión 'DefaultConnection'. " +
-        "Verifica appsettings.json.");
-}
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddHttpClient<MefService>();
+
+builder.Services.AddHttpClient<MefService>(client =>
 {
-    options.UseNpgsql(connectionString);
+    client.BaseAddress = new Uri("https://api.datosabiertos.mef.gob.pe/");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
-builder.Services.AddHttpClient();
+
+
+builder.Services.AddScoped<MefService>();
+builder.Services.AddScoped<NlqService>();
 
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 
-app.UseAntiforgery();
+app.UseStaticFiles();
 
-app.MapStaticAssets();
+app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

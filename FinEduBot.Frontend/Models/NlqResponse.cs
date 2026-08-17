@@ -1,16 +1,29 @@
+using System.Text.Json.Serialization;
+
 namespace FinEduBot.Frontend.Models;
 
-public sealed class NlqResponse
+public class NlqResponse
 {
-    public string Query { get; set; } = string.Empty;
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
 
-    public string Intent { get; set; } = string.Empty;
+    [JsonPropertyName("intent")]
+    public string? Intent { get; set; }
 
-    public string Message { get; set; } = string.Empty;
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
 
-    public IReadOnlyList<PresupuestoMensualDto>
-        PresupuestoMensual { get; set; } = [];
+    // Para la nueva funcionalidad
+    [JsonPropertyName("evolucion")]
+    public List<EvolucionPresupuesto>? Evolucion { get; set; }
 
-    public IReadOnlyList<ProyectoPresupuestoDto>
-        Proyectos { get; set; } = [];
+    // Para compatibilidad con el componente existente
+    [JsonPropertyName("presupuestos")]
+    public List<PresupuestoResumen>? Presupuestos { get; set; }
+
+    [JsonPropertyName("proyectos")]
+    public List<Proyecto>? Proyectos { get; set; }
+
+    [JsonPropertyName("contrataciones")]
+    public List<Contratacion>? Contrataciones { get; set; }
 }
