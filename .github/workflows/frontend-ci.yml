@@ -1,0 +1,38 @@
+name: Frontend CI (.NET)
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restaurar dependencias
+        run: dotnet restore
+
+      - name: Verificar formato de código
+        run: dotnet format --verify-no-changes --severity warn
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release

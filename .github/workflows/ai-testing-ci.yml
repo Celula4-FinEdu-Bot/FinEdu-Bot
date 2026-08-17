@@ -1,0 +1,41 @@
+name: Pruebas de Prompts y LLM
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/ia-ops/**"
+      - ".github/workflows/ai-testing-ci.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/ia-ops/**"
+      - ".github/workflows/ai-testing-ci.yml"
+
+jobs:
+  test-prompts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/ia-ops
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Ejecutar pruebas de QA (prompt injection, outputs)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: pytest tests/ -v
