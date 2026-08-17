@@ -1,57 +1,24 @@
-## Descripción
+## Descripción del Cambio
 
-<!-- Explica brevemente qué hace este PR y por qué es necesario -->
+\*¿Qué problema resuelve este PR o qué nodo/funcionalidad añade al sistema? Detalla la lógica implementada.
 
-## Tipo de cambio
+\*## Componentes Afectados
 
-- [ ] Nueva funcionalidad
-- [ ] Corrección de bug
-- [ ] Cambio de estructura / refactor
-- [ ] Cambio en flujos de n8n
-- [ ] Cambio en base de datos (migración)
-- [ ] Cambio en prompts / IA
-- [ ] Documentación
-- [ ] Otro (especificar):
+- [ ] Frontend (Microfrontend / NLQ)
+- [ ] Backend / n8n (Flujos, Webhooks, Lógica)
+- [ ] Base de Datos (PostgreSQL / pgvector)
+- [ ] Canal DevSecOps / IA Ops (Prompts, MLOps)
 
-## Componente(s) afectado(s)
+## Evidencia de Trabajo Técnico (Obligatorio)
 
-- [ ] `src/frontend`
-- [ ] `src/n8n-workflows`
-- [ ] `src/database`
-- [ ] `src/ia-ops`
-- [ ] `infrastructure`
-- [ ] `.github` (CI/CD)
+_Para demostrar que tú escribiste el código y lo probaste localmente:_
 
-## Checklist de estructura
+1. **Id del Issue en GitHub Projects relacionado:** #
+2. **Captura de pantalla o Logs de n8n/Langfuse:** (Pega aquí la traza de ejecución exitosa en tu entorno local)
+3. **Prompt utilizado (si aplica):** (Pega el prompt exacto o las variables del System Prompt que agregaste)
 
-- [ ] Mi cambio respeta la estructura de carpetas definida en el README
-- [ ] No agregué archivos ni carpetas fuera de `src/`, `infrastructure/` o `.github/` en la raíz del repo
-- [ ] Si agregué un flujo de n8n, está en `templates/` (no directo en `production/`)
-- [ ] Si agregué una migración de base de datos, es un archivo nuevo numerado (no edité una migración existente)
-- [ ] Si modifiqué un system prompt, actualicé el versionado en `src/ia-ops/prompts/`
+## Checklist de Calidad (Marcado por el autor)
 
-## Checklist de seguridad (DevSecOps)
-
-- [ ] No incluí credenciales, API keys, ni secretos reales en el código
-- [ ] Si agregué una variable de entorno nueva, actualicé `.env.example`
-- [ ] No subí carpetas de compilación (`bin/`, `obj/`, `node_modules/`, `dist/`)
-- [ ] Si toqué algo relacionado a IA/prompts, corrí las pruebas de `src/ia-ops/tests/` (prompt injection, outputs)
-- [ ] Revisé que no se expone información sensible en logs o respuestas de error
-
-## Pruebas realizadas
-
-<!-- ¿Cómo probaste este cambio? Build local, tests automáticos, prueba manual, etc. -->
-
-## Checklist de CI
-
-- [ ] `frontend-ci.yml` pasa en verde (si aplica)
-- [ ] `n8n-validate-ci.yml` pasa en verde (si aplica)
-- [ ] `ai-testing-ci.yml` pasa en verde (si aplica)
-
-## Screenshots / evidencia (opcional)
-
-<!-- Si aplica, agrega capturas de pantalla o logs relevantes -->
-
-## Notas para el revisor
-
-<!-- Algo específico que el revisor deba saber o priorizar al revisar -->
+- [ ] El código pasa los linters locales.
+- [ ] No hay credenciales ni tokens expuestos en texto plano (se usan variables de entorno).
+- [ ] El flujo de n8n fue exportado a formato JSON y guardado en la carpeta correspondiente.

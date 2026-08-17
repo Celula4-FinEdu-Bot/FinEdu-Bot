@@ -8,17 +8,6 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
 
 ---
 
-## Arquitectura
-
-- **Frontend:** microfrontend ligero, consulta en lenguaje natural (NLQ)
-- **Orquestación:** n8n self-hosted (Docker Compose) como backend/API central
-- **IA:** multi-modelo con failover automático (ej. OpenAI → Anthropic)
-- **Fuente de datos:** portales de Open Data / contratación pública (APIs y scrapers)
-- **Base de datos:** PostgreSQL + pgvector
-- **Observabilidad:** Langfuse / Arize Phoenix
-
-_(Diagrama de arquitectura completo: ver `/docs/arquitectura.drawio`)_
-
 ## Estructura del repositorio
 
 ```
@@ -83,14 +72,14 @@ Esto es crítico porque el bot reporta información sobre gasto público real; u
 
 ## Equipo (Célula)
 
-| Rol                             | Responsabilidad  |
-| ------------------------------- | ---------------- |
-| Arquitecto de software          | Samantha Lezma   |
-| MLOps / DevSecOps Leader        | Kevin Pasion     |
-| Backend & IA Engineers          | Diogo Canchari   |
-| Frontend & Data Interaction     | Yitzak Zamudio   |
-| QA & Prompt Engineer            | Alexander Marino |
-| Scrum Master                    | Alexandro Medina |
+| Rol                         | Responsabilidad  |
+| --------------------------- | ---------------- |
+| Arquitecto de software      | Samantha Lezma   |
+| MLOps / DevSecOps Leader    | Kevin Pasion     |
+| Backend & IA Engineers      | Diogo Canchari   |
+| Frontend & Data Interaction | Yitzak Zamudio   |
+| QA & Prompt Engineer        | Alexander Marino |
+| Scrum Master                | Alexandro Medina |
 
 ## Licencia
 

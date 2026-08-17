@@ -1,0 +1,49 @@
+name: Frontend CI Pipeline
+
+on:
+  pull_request:
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verificar estructura de archivos del Frontend
+        run: |
+          echo "=== Verificando componentes del Microfrontend NLQ ==="
+          if [ ! -d "src/frontend" ]; then
+            echo "ℹ️ No se encontró la carpeta src/frontend. Se omite validación de frontend."
+            exit 0
+          fi
+          echo "✅ Estructura de directorio validada."
+
+      - name: Instalar dependencias y validar sintaxis (si aplica package.json)
+        run: |
+          if [ -f "src/frontend/package.json" ]; then
+            cd src/frontend
+            npm ci
+            npm run lint --if-present
+            npm run build --if-present
+          else
+            echo "ℹ️ Proyecto sin package.json detectado. Pasando validación de estructura estática."
+          fi
