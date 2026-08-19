@@ -12,6 +12,8 @@ jobs:
   detect-languages:
     name: Detectar lenguajes con codigo real
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       languages: ${{ steps.detect.outputs.languages }}
     steps:
