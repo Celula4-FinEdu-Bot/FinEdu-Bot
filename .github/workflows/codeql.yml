@@ -9,8 +9,36 @@ on:
     - cron: "0 6 * * 1"
 
 jobs:
+  detect-languages:
+    name: Detectar lenguajes con codigo real
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.detect.outputs.languages }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Buscar archivos de codigo por lenguaje
+        id: detect
+        run: |
+          LANGS=()
+
+          if find . -path "*/node_modules" -prune -o -type f \( -iname "*.ts" -o -iname "*.tsx" -o -iname "*.js" -o -iname "*.jsx" \) -print | grep -q .; then
+            LANGS+=("javascript-typescript")
+          fi
+
+          if find . -path "*/node_modules" -prune -o -type f -iname "*.py" -print | grep -q .; then
+            LANGS+=("python")
+          fi
+
+          JSON=$(printf '%s\n' "${LANGS[@]}" | jq -R . | jq -s -c .)
+          echo "languages=$JSON" >> "$GITHUB_OUTPUT"
+          echo "Lenguajes detectados con codigo real: $JSON"
+
   analyze:
-    name: CodeQL
+    name: CodeQL - ${{ matrix.language }}
+    needs: detect-languages
+    if: needs.detect-languages.outputs.languages != '[]'
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -19,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["javascript-typescript", "python"]
+        language: ${{ fromJson(needs.detect-languages.outputs.languages) }}
 
     steps:
       - name: Checkout del repositorio
