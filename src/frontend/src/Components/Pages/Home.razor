@@ -1,0 +1,441 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using System.Text.Json
+@using src.Models
+@using src.Services
+
+@inject NlqService NlqService  // Cambiar de MefService a NlqService
+
+<PageTitle>FinEdu-Bot | Inicio</PageTitle>
+
+<div class="fin-edu-page">
+
+    <!-- ENCABEZADO PRINCIPAL -->
+    <section class="hero-section">
+
+        <div class="hero-content">
+
+            <div class="hero-label">
+                FINEDU-BOT
+            </div>
+
+            <h1>
+                Monitor de Transparencia
+                <br />
+                Económica y Gasto Público
+            </h1>
+
+            <p>
+                Consulta información presupuestaria del MEF
+                utilizando lenguaje natural.
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- CONSULTA NLQ -->
+    <section class="query-card">
+
+        <div class="query-header">
+
+            <div>
+
+                <div class="section-label">
+                    NATURAL LANGUAGE QUERY
+                </div>
+
+                <h2>
+                    ¿Qué deseas consultar?
+                </h2>
+
+            </div>
+
+            <div class="source-badge">
+                MEF
+            </div>
+
+        </div>
+
+
+        <!-- INPUT -->
+        <div class="query-container">
+
+            <input
+                class="query-input"
+                type="text"
+                placeholder="Ej. ¿Cuál fue la evolución del presupuesto de la Municipalidad de Lima?"
+                @bind="Pregunta"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown" />
+
+            <button
+                class="query-button"
+                @onclick="ConsultarAsync"
+                disabled="@Cargando">
+
+                @if (Cargando)
+                {
+                    <span class="spinner"></span>
+                    <span>Consultando...</span>
+                }
+                else
+                {
+                    <span>Consultar</span>
+                }
+
+            </button>
+
+        </div>
+
+
+        <!-- PREGUNTAS DE EJEMPLO -->
+        <div class="examples">
+
+            <span>Ejemplos:</span>
+
+            <button @onclick='() => SeleccionarPregunta(
+                "¿Cuál fue la evolución del presupuesto entre 2012 y 2016?")'>
+
+                Evolución del presupuesto
+            </button>
+
+            <button @onclick='() => SeleccionarPregunta(
+                "Municipalidad de Lima")'>
+
+                Municipalidad de Lima
+            </button>
+
+            <button @onclick='() => SeleccionarPregunta(
+                "Gobierno Regional de Lima")'>
+
+                Gobierno Regional
+            </button>
+
+        </div>
+
+
+        <!-- ERROR -->
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="error-message">
+
+                <div class="error-title">
+                    Error
+                </div>
+
+                <div>
+                    @Error
+                </div>
+
+            </div>
+        }
+
+
+        <!-- RESULTADOS -->
+        @if (Resultado is not null)
+        {
+            <section class="results-section">
+
+                <!-- RESUMEN -->
+                <div class="results-summary">
+
+                    <div class="summary-card">
+
+                        <span class="summary-label">
+                            INTENCIÓN DETECTADA
+                        </span>
+
+                        <strong class="summary-value" style="font-size:16px;">
+                            @Resultado.Intent
+                        </strong>
+
+                    </div>
+
+                    <div class="summary-card">
+
+                        <span class="summary-label">
+                            ESTADO
+                        </span>
+
+                        <strong class="summary-value" style="font-size:16px; color: @(Resultado.Success ? "#16a34a" : "#dc2626")">
+                            @(Resultado.Success ? "ÉXITO" : "ERROR")
+                        </strong>
+
+                    </div>
+
+                    <div class="summary-card">
+
+                        <span class="summary-label">
+                            FUENTE
+                        </span>
+
+                        <strong class="summary-source">
+                            MEF
+                        </strong>
+
+                    </div>
+
+                </div>
+
+                <!-- MENSAJE -->
+                <div class="alert @(Resultado.Success ? "alert-success" : "alert-warning")">
+                    @Resultado.Message
+                </div>
+
+                <!-- MOSTRAR EVOLUCIÓN -->
+                @if (Resultado.Evolucion != null && Resultado.Evolucion.Any())
+                {
+                    <div class="data-card">
+
+                        <div class="data-card-header">
+
+                            <div>
+
+                                <span class="section-label">
+                                    DATOS DEL MEF
+                                </span>
+
+                                <h3>
+                                    Evolución Presupuestaria
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                        <div class="table-container">
+
+                            <table class="data-table">
+
+                                <thead>
+
+                                    <tr>
+                                        <th>Año</th>
+                                        <th>Entidad</th>
+                                        <th>PIA (S/.)</th>
+                                        <th>PIM (S/.)</th>
+                                        <th>Devengado (S/.)</th>
+                                        <th>% Ejecución</th>
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var item in Resultado.Evolucion)
+                                    {
+                                        <tr>
+                                            <td><strong>@item.Anio</strong></td>
+                                            <td>@item.Entidad</td>
+                                            <td>@item.PresupuestoInicialDisplay</td>
+                                            <td>@item.PresupuestoModificadoDisplay</td>
+                                            <td>@item.MontoEjecutadoDisplay</td>
+                                            <td>
+                                                <span class="badge @(item.PorcentajeEjecucion >= 80 ? "bg-success" : item.PorcentajeEjecucion >= 50 ? "bg-warning" : "bg-danger")">
+                                                    @item.PorcentajeEjecucionDisplay
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+                }
+                else if (Resultado.Presupuestos != null && Resultado.Presupuestos.Any())
+                {
+                    <!-- Fallback: Mostrar Presupuestos si está disponible -->
+                    <div class="data-card">
+
+                        <div class="data-card-header">
+
+                            <div>
+
+                                <span class="section-label">
+                                    DATOS DEL MEF
+                                </span>
+
+                                <h3>
+                                    Datos Presupuestarios
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                        <div class="table-container">
+
+                            <table class="data-table">
+
+                                <thead>
+
+                                    <tr>
+                                        <th>Año</th>
+                                        <th>Mes</th>
+                                        <th>PIA (S/.)</th>
+                                        <th>PIM (S/.)</th>
+                                        <th>Ejecutado (S/.)</th>
+                                        <th>% Ejecución</th>
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var item in Resultado.Presupuestos)
+                                    {
+                                        <tr>
+                                            <td><strong>@item.Anio</strong></td>
+                                            <td>@item.Mes</td>
+                                            <td>@item.PIA.ToString("N2")</td>
+                                            <td>@item.PIM.ToString("N2")</td>
+                                            <td>@item.Ejecutado.ToString("N2")</td>
+                                            <td>@item.PorcentajeEjecucion.ToString("N2")%</td>
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+                }
+                else if (!Resultado.Success && Resultado.Intent != "NoReconocido")
+                {
+                    <div class="alert alert-info">
+                        No se encontraron datos para tu consulta.
+                        <br />
+                        <small>Intenta con: "¿Cuál fue la evolución del presupuesto entre 2012 y 2016?"</small>
+                    </div>
+                }
+
+            </section>
+        }
+
+    </section>
+
+</div>
+
+
+<style>
+    /* ... Tu CSS existente ... */
+    .badge {
+        padding: 5px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .bg-success {
+        background: #16a34a;
+        color: white;
+    }
+    .bg-warning {
+        background: #f59e0b;
+        color: white;
+    }
+    .bg-danger {
+        background: #dc2626;
+        color: white;
+    }
+</style>
+
+
+@code {
+
+    /*
+     * Pregunta escrita por el usuario.
+     */
+    private string Pregunta { get; set; } = string.Empty;
+
+
+    /*
+     * Indica si existe una consulta ejecutándose.
+     */
+    private bool Cargando { get; set; }
+
+
+    /*
+     * Mensaje de error para mostrar en pantalla.
+     */
+    private string? Error { get; set; }
+
+
+    /*
+     * Respuesta obtenida desde el NlqService.
+     */
+    private NlqResponse? Resultado { get; set; }
+
+
+    /*
+     * Ejecuta la consulta cuando el usuario
+     * presiona el botón Consultar.
+     */
+    private async Task ConsultarAsync()
+    {
+        Error = null;
+        Resultado = null;
+
+        if (string.IsNullOrWhiteSpace(Pregunta))
+        {
+            Error = "Escribe una consulta antes de presionar Consultar.";
+            return;
+        }
+
+        try
+        {
+            Cargando = true;
+
+            // Usar NlqService en lugar de MefService directamente
+            Resultado = await NlqService.ProcesarAsync(Pregunta.Trim());
+        }
+        catch (HttpRequestException ex)
+        {
+            Error = $"No fue posible comunicarse con el API del MEF. Detalle: {ex.Message}";
+        }
+        catch (TaskCanceledException)
+        {
+            Error = "La consulta al MEF tardó demasiado tiempo. Intenta nuevamente.";
+        }
+        catch (Exception ex)
+        {
+            Error = $"Ocurrió un error procesando la consulta. Detalle: {ex.Message}";
+        }
+        finally
+        {
+            Cargando = false;
+        }
+    }
+
+
+    /*
+     * Permite ejecutar la consulta presionando ENTER.
+     */
+    private async Task HandleKeyDown(
+        Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !Cargando)
+        {
+            await ConsultarAsync();
+        }
+    }
+
+
+    /*
+     * Coloca una pregunta de ejemplo en el buscador.
+     */
+    private void SeleccionarPregunta(string pregunta)
+    {
+        Pregunta = pregunta;
+        Error = null;
+        Resultado = null;
+    }
+}
