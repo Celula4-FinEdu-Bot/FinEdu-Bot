@@ -12,6 +12,9 @@ on:
       - "src/ia-ops/**"
       - ".github/workflows/ai-testing-ci.yml"
 
+permissions:
+  contents: read
+
 jobs:
   ai-testing:
     name: QA de Prompts y Salidas del Modelo
