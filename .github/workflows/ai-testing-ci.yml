@@ -1,0 +1,56 @@
+name: AI Ops & Prompt Security Testing
+
+on:
+  # Sin filtro de "paths" en pull_request: este workflow es required check en main.
+  # Si tuviera paths aquí, un PR que no toque src/ia-ops quedaría bloqueado
+  # indefinidamente en "Expected — Waiting for status".
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/ia-ops/**"
+      - ".github/workflows/ai-testing-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ai-testing:
+    name: QA de Prompts y Salidas del Modelo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Validar estructura de IA Ops
+        run: |
+          echo "Verificando carpetas esperadas en src/ia-ops..."
+          test -d "src/ia-ops/prompts"
+          test -d "src/ia-ops/tests"
+          test -d "src/ia-ops/config-observability"
+          echo "Estructura de IA Ops válida."
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests pydantic
+          [ -f src/ia-ops/requirements.txt ] && pip install -r src/ia-ops/requirements.txt || true
+
+      - name: Ejecutar pruebas de IA (si existen)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null)
+          if [ -n "$TEST_FILES" ]; then
+            pytest src/ia-ops/tests/ -v --tb=short
+          else
+            echo "Aún no hay archivos de prueba en src/ia-ops/tests. Se omite la ejecución."
+          fi
