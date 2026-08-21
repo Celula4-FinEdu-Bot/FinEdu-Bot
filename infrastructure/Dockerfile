@@ -17,25 +17,41 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 
 WORKDIR /source
 
+ENV NUGET_PACKAGES=/root/.nuget/packages
+
+
 # ==========================================
-# COPIAR PROYECTO .NET
+# COPIAR PROYECTO
 # ==========================================
 
 COPY src/frontend/src/src.csproj src/frontend/src/
 
-# Restaurar dependencias
-RUN dotnet restore src/frontend/src/src.csproj
+
+# ==========================================
+# LIMPIAR CACHE NUGET
+# ==========================================
+
+RUN dotnet nuget locals all --clear
 
 
 # ==========================================
-# COPIAR CÓDIGO DEL PROYECTO
+# RESTORE
+# ==========================================
+
+RUN dotnet restore src/frontend/src/src.csproj \
+    --force \
+    --no-cache
+
+
+# ==========================================
+# COPIAR CÓDIGO
 # ==========================================
 
 COPY src/frontend/src/ src/frontend/src/
 
 
 # ==========================================
-# COMPILAR
+# BUILD
 # ==========================================
 
 WORKDIR /source/src/frontend/src
@@ -71,23 +87,18 @@ COPY --from=publish /app/publish .
 
 
 # ==========================================
-# CONFIGURACIÓN ASP.NET
+# ASP.NET CORE
 # ==========================================
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-
-# ==========================================
-# PUERTO
-# ==========================================
-
 EXPOSE 8080
 
 
 # ==========================================
-# EJECUTAR
+# START
 # ==========================================
 
 ENTRYPOINT ["dotnet", "src.dll"]
