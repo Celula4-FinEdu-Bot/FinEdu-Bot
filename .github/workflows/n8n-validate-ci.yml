@@ -10,7 +10,8 @@ on:
     branches: [main, develop]
     paths:
       - "src/n8n-workflows/**"
-
+permissions:
+  contents: read
 jobs:
   validate-json:
     runs-on: ubuntu-latest
