@@ -145,9 +145,9 @@ Este proyecto sigue reglas estrictas de control de versiones, alineadas al manif
 
 Una vez desplegado, el bot es monitoreado en tiempo real (Langfuse / Arize Phoenix) para registrar:
 
-- Costo de tokens por consulta
-- Latencia de respuesta
-- Tasa de respuestas sin fuente citada (posible alucinación)
+- Costo de tokens por consulta.
+- Latencia de respuesta.
+- Tasa de respuestas sin fuente citada (posible alucinación).
 
 Esto es crítico porque el bot reporta información sobre gasto público real; una respuesta sin respaldo podría generar una acusación falsa contra una empresa o municipalidad.
 
