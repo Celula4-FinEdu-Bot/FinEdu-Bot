@@ -34,22 +34,17 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
     ├── ai-testing-ci.yml         # Pipeline IA Ops: Pruebas unitarias de prompts y LLMs
     └── codeql.yml                # Pipeline DevSecOps: Análisis estático de seguridad (SAST)
 src/
-├── app/                          # Composición de Express y middlewares
-├── application/                  # Casos de uso y DTOs
-├── config/                       # Variables de entorno y configuración global
-├── domain/                       # Entidades y contratos del negocio
-├── frontend/                     # Microfrontend (NLQ)
-├── infrastructure/               # Adaptadores HTTP e integraciones externas
-├── n8n-workflows/                # Flujos exportados (JSON) - producción y templates
-├── server.ts                     # Punto de entrada del servidor (Node.js + Express)
-├── shared/                       # Errores y utilidades compartidas
+├── frontend/                     # Espacio base del frontend compartido del repo
+├── n8n-workflows/                # Carpeta del backend y workflows n8n de Backend-Canchari
+│   ├── frontend/                 # index.html servido por Express
+│   ├── infrastructure/           # docker-compose y .env.example del backend
+│   ├── src/                      # Código TypeScript del backend
+│   ├── package.json              # Scripts Node del backend
+│   └── tsconfig.json             # Configuración TypeScript del backend
 ├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
 └── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
-infrastructure/                   # Recursos de infraestructura del proyecto
 .gitignore
-eslint.config.mjs
-package.json
-tsconfig.json
+infrastructure/                   # Recursos compartidos del proyecto
 LICENSE
 README.md
 ```
@@ -64,11 +59,11 @@ README.md
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd FinEdu-Bot
+cd FinEdu-Bot/src/n8n-workflows
 npm install
 ```
 
-Crear un archivo `.env` en la raíz del repositorio, siguiendo la plantilla de `infrastructure/.env.example`:
+Crear un archivo `.env` en `src/n8n-workflows`, siguiendo la plantilla de `src/n8n-workflows/infrastructure/.env.example`:
 
 ```env
 NODE_ENV=development
