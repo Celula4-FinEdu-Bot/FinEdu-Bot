@@ -1,111 +1,136 @@
-node_modules/
-dist/
-.env
-coverage/
 # ============================================================
-# .NET
+# BASE
 # ============================================================
 
-**/bin/
-**/obj/
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 
-*.dll
-*.exe
-*.pdb
+WORKDIR /app
 
-# ============================================================
-# Visual Studio
-# ============================================================
+EXPOSE 8080
 
-.vs/
-.vscode/
-
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
 
 # ============================================================
-# Rider / JetBrains
+# BUILD
 # ============================================================
 
-.idea/
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+
+WORKDIR /source
+
+# Directorio donde NuGet almacenará los paquetes
+ENV NUGET_PACKAGES=/root/.nuget/packages
+
 
 # ============================================================
-# NuGet
+# LIMPIEZA
 # ============================================================
 
-packages/
+# Evitar que archivos bin/obj provenientes del repositorio
+# interfieran con el restore de Docker.
+RUN rm -rf /source/src/frontend/src/bin \
+           /source/src/frontend/src/obj
+
 
 # ============================================================
-# Tests
+# COPIAR SOLO EL PROYECTO
 # ============================================================
 
-TestResults/
+COPY src/frontend/src/src.csproj \
+     ./src/frontend/src/src.csproj
+
 
 # ============================================================
-# Node
+# LIMPIAR CACHE DE NUGET
 # ============================================================
 
-node_modules/
+RUN dotnet nuget locals all --clear
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # ============================================================
-# Python
+# RESTORE
 # ============================================================
 
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
-venv/
-env/
+RUN dotnet restore \
+    ./src/frontend/src/src.csproj \
+    --force \
+    --no-cache
+
 
 # ============================================================
-# Environment variables
+# COPIAR EL CÓDIGO DEL FRONTEND
 # ============================================================
 
-.env
-.env.local
-.env.development
-.env.production
-.env.test
+COPY src/frontend/src/ \
+     ./src/frontend/src/
 
-# Permitir plantilla
-!.env.example
 
 # ============================================================
-# OS
+# LIMPIAR BIN/OBJ COPIADOS
 # ============================================================
 
-.DS_Store
-Thumbs.db
+RUN rm -rf ./src/frontend/src/bin \
+           ./src/frontend/src/obj
+
 
 # ============================================================
-# Logs
+# RESTORE NUEVAMENTE
 # ============================================================
 
-*.log
+RUN dotnet restore \
+    ./src/frontend/src/src.csproj \
+    --force \
+    --no-cache
+
 
 # ============================================================
-# Docker
+# BUILD
 # ============================================================
 
-docker-compose.override.yml
+WORKDIR /source/src/frontend/src
+
+RUN dotnet build src.csproj \
+    -c Release \
+    -o /app/build
+
 
 # ============================================================
-# Publish
+# PUBLISH
 # ============================================================
 
-publish/
-artifacts/
+FROM build AS publish
+
+WORKDIR /source/src/frontend/src
+
+RUN dotnet publish src.csproj \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false
+
 
 # ============================================================
-# Temporary
+# FINAL
 # ============================================================
 
-*.tmp
-*.temp
+FROM base AS final
+
+WORKDIR /app
+
+COPY --from=publish /app/publish .
+
+
+# ============================================================
+# CONFIGURACIÓN ASP.NET CORE / RENDER
+# ============================================================
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+EXPOSE 8080
+
+
+# ============================================================
+# EJECUTAR
+# ============================================================
+
+ENTRYPOINT ["dotnet", "src.dll"]

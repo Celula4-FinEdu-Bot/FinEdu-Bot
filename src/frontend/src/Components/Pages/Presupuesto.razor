@@ -1,0 +1,167 @@
+@page "/presupuesto"
+@using src.Models
+@using src.Services
+@inject NlqService NlqService
+
+<h3>Evolución del Presupuesto</h3>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="input-group mb-3">
+            <input type="text" 
+                   class="form-control" 
+                   placeholder="Ej: ¿Cuál fue la evolución del presupuesto entre 2012 y 2016?" 
+                   @bind="consulta" />
+            <button class="btn btn-primary" @onclick="Consultar">Consultar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Preguntas de ejemplo -->
+<div class="mb-3">
+    <small class="text-muted">Ejemplos rápidos:</small>
+    <button class="btn btn-sm btn-outline-secondary ms-2" @onclick='() => SeleccionarPregunta("¿Cuál fue la evolución del presupuesto entre 2012 y 2016?")'>
+        Evolución 2012-2016
+    </button>
+    <button class="btn btn-sm btn-outline-secondary ms-2" @onclick='() => SeleccionarPregunta("Municipalidad de Lima")'>
+        Municipalidad de Lima
+    </button>
+</div>
+
+@if (cargando)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+
+@if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (resultado != null && resultado.Success)
+{
+    <div class="alert alert-success">@resultado.Message</div>
+    
+    @if (resultado.Evolucion != null && resultado.Evolucion.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Año</th>
+                        <th>Entidad</th>
+                        <th>PIA (S/.)</th>
+                        <th>PIM (S/.)</th>
+                        <th>Devengado (S/.)</th>
+                        <th>% Ejecución</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in resultado.Evolucion)
+                    {
+                        <tr>
+                            <td><strong>@item.Anio</strong></td>
+                            <td>@item.Entidad</td>
+                            <td>@item.PresupuestoInicialDisplay</td>
+                            <td>@item.PresupuestoModificadoDisplay</td>
+                            <td>@item.MontoEjecutadoDisplay</td>
+                            <td>
+                                <span class="badge @(item.PorcentajeEjecucion >= 80 ? "bg-success" : item.PorcentajeEjecucion >= 50 ? "bg-warning" : "bg-danger")">
+                                    @item.PorcentajeEjecucionDisplay
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Resumen de ejecución -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Resumen de Ejecución Presupuestaria</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var item in resultado.Evolucion)
+                    {
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">@item.Anio</h6>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar @(item.PorcentajeEjecucion >= 80 ? "bg-success" : item.PorcentajeEjecucion >= 50 ? "bg-warning" : "bg-danger")"
+                                             role="progressbar"
+                                             style="width: @item.PorcentajeEjecucion%"
+                                             aria-valuenow="@item.PorcentajeEjecucion"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                            @item.PorcentajeEjecucionDisplay
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Ejecutado: @item.MontoEjecutadoDisplay</small>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">No se encontraron datos para la consulta.</div>
+    }
+}
+else if (resultado != null && !resultado.Success)
+{
+    <div class="alert alert-warning">@resultado.Message</div>
+}
+
+@code {
+    private string consulta = "¿Cuál fue la evolución del presupuesto entre 2012 y 2016?";
+    private NlqResponse? resultado;
+    private bool cargando = false;
+    private string? error = null;
+
+    private void SeleccionarPregunta(string pregunta)
+    {
+        consulta = pregunta;
+    }
+
+    private async Task Consultar()
+    {
+        if (string.IsNullOrWhiteSpace(consulta))
+        {
+            error = "Por favor, ingresa una consulta.";
+            return;
+        }
+
+        cargando = true;
+        error = null;
+        resultado = null;
+
+        try
+        {
+            resultado = await NlqService.ProcesarAsync(consulta);
+            
+            // Si la consulta fue exitosa
+            if (resultado.Success && resultado.Evolucion != null && resultado.Evolucion.Any())
+            {
+                // La vista se actualizará automáticamente
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Error al procesar la consulta: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}
