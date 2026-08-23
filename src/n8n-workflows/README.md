@@ -1,11 +1,10 @@
 ## n8n-workflows
 
-Esta carpeta ahora concentra la parte de Backend-Canchari:
+Esta carpeta concentra la parte de Backend-Canchari y los flujos de n8n:
 
 - `src/` contiene el backend Express/TypeScript.
-- `frontend/index.html` contiene la interfaz servida por el backend.
-- `infrastructure/` contiene `docker-compose.yml` y `.env.example`.
 - `production/` y `templates/` mantienen los workflows de n8n.
+- Los archivos de infraestructura compartida viven en la carpeta raíz `infrastructure/`.
 
 ## Comandos
 
@@ -20,11 +19,6 @@ npm run check
 
 ```text
 n8n-workflows/
-	frontend/
-		index.html
-	infrastructure/
-		.env.example
-		docker-compose.yml
 	production/
 	src/
 		app/
@@ -35,6 +29,10 @@ n8n-workflows/
 		shared/
 		server.ts
 	templates/
+	.prettierignore
+	.prettierrc.json
+	eslint.config.mjs
+	package-lock.json
 	package.json
 	tsconfig.json
 ```
