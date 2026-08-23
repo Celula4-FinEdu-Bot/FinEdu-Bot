@@ -6,6 +6,9 @@ on:
   # indefinidamente en "Expected — Waiting for status".
   pull_request:
     branches: [main, develop]
+    paths:
+      - "src/ia-ops/**"
+      - ".github/workflows/ai-testing-ci.yml"
   push:
     branches: [main, develop]
     paths:
