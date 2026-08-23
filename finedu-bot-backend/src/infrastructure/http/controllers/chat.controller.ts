@@ -37,7 +37,8 @@ export const chatController = {
       }
 
       response.status(webhookResponse.status).send(responseText);
-    } catch (_error) {
+    } catch (error) {
+      void error;
       response.status(500).json({ error: 'Failed to connect to n8n webhook' });
     }
   }
