@@ -34,15 +34,22 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
     ├── ai-testing-ci.yml         # Pipeline IA Ops: Pruebas unitarias de prompts y LLMs
     └── codeql.yml                # Pipeline DevSecOps: Análisis estático de seguridad (SAST)
 src/
+├── app/                          # Composición de Express y middlewares
+├── application/                  # Casos de uso y DTOs
+├── config/                       # Variables de entorno y configuración global
+├── domain/                       # Entidades y contratos del negocio
 ├── frontend/                     # Microfrontend (NLQ)
+├── infrastructure/               # Adaptadores HTTP e integraciones externas
 ├── n8n-workflows/                # Flujos exportados (JSON) - producción y templates
+├── server.ts                     # Punto de entrada del servidor (Node.js + Express)
+├── shared/                       # Errores y utilidades compartidas
 ├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
 └── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
-finedu-bot-backend/
-├── .env.example                  # Plantilla de variables de entorno del backend
-└── src/server.ts                 # Punto de entrada del servidor (Node.js + Express)
 infrastructure/                   # Recursos de infraestructura del proyecto
 .gitignore
+eslint.config.mjs
+package.json
+tsconfig.json
 LICENSE
 README.md
 ```
@@ -57,11 +64,11 @@ README.md
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd finedu-bot-backend
+cd FinEdu-Bot
 npm install
 ```
 
-Crear un archivo `.env` en la raíz del backend, siguiendo la plantilla de `.env.example`:
+Crear un archivo `.env` en la raíz del repositorio, siguiendo la plantilla de `infrastructure/.env.example`:
 
 ```env
 NODE_ENV=development

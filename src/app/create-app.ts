@@ -10,7 +10,7 @@ import { buildRoutes } from '../infrastructure/http/routes';
 
 export function createApp() {
   const app = express();
-  const frontendDir = path.resolve(__dirname, '../../../src/frontend');
+  const frontendDir = path.resolve(__dirname, '../../src/frontend');
 
   app.use(
     helmet({
