@@ -1,6 +1,9 @@
 name: SAST - Analisis Estatico de Seguridad
 
 on:
+  # Sin filtro de "paths": CodeQL analiza el repositorio completo,
+  # y como puede ser required check, debe correr siempre para no
+  # quedar colgado en "Expected - Waiting for status".
   pull_request:
     branches: [main, develop]
   push:
@@ -9,38 +12,8 @@ on:
     - cron: "0 6 * * 1"
 
 jobs:
-  detect-languages:
-    name: Detectar lenguajes con codigo real
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      languages: ${{ steps.detect.outputs.languages }}
-    steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-
-      - name: Buscar archivos de codigo por lenguaje
-        id: detect
-        run: |
-          LANGS=()
-
-          if find . -path "*/node_modules" -prune -o -type f \( -iname "*.ts" -o -iname "*.tsx" -o -iname "*.js" -o -iname "*.jsx" \) -print | grep -q .; then
-            LANGS+=("javascript-typescript")
-          fi
-
-          if find . -path "*/node_modules" -prune -o -type f -iname "*.py" -print | grep -q .; then
-            LANGS+=("python")
-          fi
-
-          JSON=$(printf '%s\n' "${LANGS[@]}" | jq -R . | jq -s -c .)
-          echo "languages=$JSON" >> "$GITHUB_OUTPUT"
-          echo "Lenguajes detectados con codigo real: $JSON"
-
   analyze:
     name: CodeQL - ${{ matrix.language }}
-    needs: detect-languages
-    if: needs.detect-languages.outputs.languages != '[]'
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -48,22 +21,45 @@ jobs:
 
     strategy:
       fail-fast: false
+      # Matriz fija (no dinamica): las categorias de CodeQL deben ser
+      # siempre las mismas entre main y cada PR, o GitHub no puede
+      # comparar los resultados ("configuration not found on main").
       matrix:
-        language: ${{ fromJson(needs.detect-languages.outputs.languages) }}
+        language: ["javascript-typescript", "python"]
 
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
+      - name: Verificar si hay codigo real para este lenguaje
+        id: check
+        run: |
+          if [ "${{ matrix.language }}" = "javascript-typescript" ]; then
+            MATCH=$(find . -path "*/node_modules" -prune -o -type f \( -iname "*.ts" -o -iname "*.tsx" -o -iname "*.js" -o -iname "*.jsx" \) -print | head -1)
+          elif [ "${{ matrix.language }}" = "python" ]; then
+            MATCH=$(find . -path "*/node_modules" -prune -o -type f -iname "*.py" -print | head -1)
+          fi
+
+          if [ -n "$MATCH" ]; then
+            echo "has_code=true" >> "$GITHUB_OUTPUT"
+            echo "Codigo encontrado para ${{ matrix.language }}: $MATCH"
+          else
+            echo "has_code=false" >> "$GITHUB_OUTPUT"
+            echo "Aun no hay codigo ${{ matrix.language }} en el repositorio. Se omite el analisis."
+          fi
+
       - name: Inicializar CodeQL
+        if: steps.check.outputs.has_code == 'true'
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
       - name: Analisis automatico
+        if: steps.check.outputs.has_code == 'true'
         uses: github/codeql-action/autobuild@v3
 
       - name: Ejecutar analisis CodeQL
+        if: steps.check.outputs.has_code == 'true'
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
