@@ -3,45 +3,77 @@ name: Validar JSONs de n8n
 on:
   pull_request:
     branches: [main, develop]
-    paths:
-      - "src/n8n-workflows/**"
-      - ".github/workflows/n8n-validate-ci.yml"
   push:
     branches: [main, develop]
     paths:
       - "src/n8n-workflows/**"
+      - ".github/workflows/n8n-validate-ci.yml"
+
 permissions:
   contents: read
+
 jobs:
   validate-json:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
 
       - name: Validar sintaxis JSON
         run: |
           echo "Validando archivos JSON de n8n..."
+          FILES=$(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null)
+          if [ -z "$FILES" ]; then
+            echo "Aun no hay flujos JSON. Se omite validacion."
+            exit 0
+          fi
           error_found=0
-          for file in $(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null); do
+          for file in $FILES; do
             if ! python3 -m json.tool "$file" > /dev/null 2>&1; then
-              echo "❌ JSON inválido: $file"
+              echo "JSON invalido: $file"
               error_found=1
             else
-              echo "✅ OK: $file"
+              echo "OK: $file"
             fi
           done
           if [ $error_found -eq 1 ]; then
             exit 1
           fi
 
-      - name: Verificar que production/ solo tenga workflows aprobados
+      - name: Verificar estructura minima de flujos en production/
         run: |
-          echo "Revisando estructura mínima de cada workflow en production/..."
-          for file in $(find src/n8n-workflows/production -name "*.json" 2>/dev/null); do
+          FILES=$(find src/n8n-workflows/production -name "*.json" 2>/dev/null)
+          if [ -z "$FILES" ]; then
+            echo "Aun no hay flujos en production/. Se omite verificacion."
+            exit 0
+          fi
+          for file in $FILES; do
             if ! python3 -c "import json,sys; d=json.load(open('$file')); sys.exit(0 if 'nodes' in d and 'connections' in d else 1)"; then
-              echo "❌ $file no parece un workflow válido de n8n (falta 'nodes' o 'connections')"
+              echo "$file no parece un workflow valido de n8n (falta 'nodes' o 'connections')"
               exit 1
             fi
           done
+
+      - name: Buscar credenciales quemadas en los flujos JSON
+        run: |
+          echo "Buscando patrones de credenciales expuestas..."
+          FILES=$(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null)
+          if [ -z "$FILES" ]; then
+            echo "Aun no hay flujos JSON. Se omite escaneo de credenciales."
+            exit 0
+          fi
+          PATTERN='(api[_-]?key|apikey|secret|password|passwd|token|bearer|authorization)["\x27]?\s*[:=]\s*["\x27][A-Za-z0-9_\-]{8,}'
+          found=0
+          for file in $FILES; do
+            if grep -Eio "$PATTERN" "$file" > /dev/null; then
+              echo "Posible credencial quemada en: $file"
+              grep -Eino "$PATTERN" "$file"
+              found=1
+            fi
+          done
+          if [ $found -eq 1 ]; then
+            echo "Se encontraron posibles credenciales expuestas. Revisa el flujo y usa credenciales de n8n (Credentials) en vez de valores literales."
+            exit 1
+          fi
+          echo "No se encontraron credenciales quemadas."
