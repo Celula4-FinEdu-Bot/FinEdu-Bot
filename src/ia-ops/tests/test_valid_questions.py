@@ -4,8 +4,7 @@ import requests
 
 
 WEBHOOK_URL = os.getenv(
-    "N8N_WEBHOOK_URL",
-    "http://localhost:5678/webhook-test/6b1594d1-5b27-4347-90b5-df5e757fc649",
+    WEBHOOK_URL = "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
 )
 
 

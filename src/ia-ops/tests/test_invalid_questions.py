@@ -20,7 +20,7 @@ def test_pregunta_vacia():
     print(f"HTTP: {response.status_code}")
     print(f"Respuesta: {response.text}")
 
-    assert response.status_code in [200, 400]
+    assert response.status_code == 422
 
 
 def test_campo_question_inexistente():
@@ -32,7 +32,7 @@ def test_campo_question_inexistente():
     print(f"HTTP: {response.status_code}")
     print(f"Respuesta: {response.text}")
 
-    assert response.status_code in [200, 400]
+    assert response.status_code == 422
 
 
 def test_json_incorrecto():
@@ -49,4 +49,4 @@ def test_json_incorrecto():
     print(f"HTTP: {response.status_code}")
     print(f"Respuesta: {response.text}")
 
-    assert response.status_code in [200, 400]
+    assert response.status_code == 422
