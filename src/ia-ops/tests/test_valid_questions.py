@@ -4,9 +4,9 @@ import requests
 
 
 WEBHOOK_URL = os.getenv(
-    WEBHOOK_URL = "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
+    "WEBHOOK_URL",
+    "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
 )
-
 
 def enviar_pregunta(question):
     response = requests.post(
