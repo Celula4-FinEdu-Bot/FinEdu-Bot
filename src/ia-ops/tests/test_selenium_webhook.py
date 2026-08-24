@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 
 WEBHOOK_URL = os.getenv(
     "N8N_WEBHOOK_URL",
-    "http://localhost:5678/webhook/796f892f-e2dc-4bf9-88da-201de4fa6bd7",
+    "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator",
 )
 
 

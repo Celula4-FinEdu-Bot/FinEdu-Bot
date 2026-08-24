@@ -1,6 +1,6 @@
 import requests
 
-WEBHOOK_URL = "http://localhost:5678/webhook/796f892f-e2dc-4bf9-88da-201de4fa6bd7"
+WEBHOOK_URL = "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
 
 
 def enviar_pregunta(data):
