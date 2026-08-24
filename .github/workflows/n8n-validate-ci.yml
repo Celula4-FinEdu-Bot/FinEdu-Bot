@@ -1,0 +1,47 @@
+name: Validar JSONs de n8n
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/n8n-workflows/**"
+      - ".github/workflows/n8n-validate-ci.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/n8n-workflows/**"
+permissions:
+  contents: read
+jobs:
+  validate-json:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Validar sintaxis JSON
+        run: |
+          echo "Validando archivos JSON de n8n..."
+          error_found=0
+          for file in $(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null); do
+            if ! python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "❌ JSON inválido: $file"
+              error_found=1
+            else
+              echo "✅ OK: $file"
+            fi
+          done
+          if [ $error_found -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Verificar que production/ solo tenga workflows aprobados
+        run: |
+          echo "Revisando estructura mínima de cada workflow en production/..."
+          for file in $(find src/n8n-workflows/production -name "*.json" 2>/dev/null); do
+            if ! python3 -c "import json,sys; d=json.load(open('$file')); sys.exit(0 if 'nodes' in d and 'connections' in d else 1)"; then
+              echo "❌ $file no parece un workflow válido de n8n (falta 'nodes' o 'connections')"
+              exit 1
+            fi
+          done
