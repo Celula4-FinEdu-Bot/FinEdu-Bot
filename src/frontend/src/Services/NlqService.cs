@@ -1,7 +1,4 @@
 using src.Models;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
 
 namespace src.Services;
 
@@ -25,30 +22,6 @@ public sealed class NlqService
                 Success = false,
                 Message = "Escribe una consulta. Ejemplo: ¿Cuál fue la evolución del presupuesto entre 2012 y 2016?"
             };
-        }
-
-        try 
-        {
-            using var client = new HttpClient();
-            var payload = JsonSerializer.Serialize(new { mensaje = pregunta, accion = "consultar_agente" });
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-            // Se envía la petición a tu entorno local
-            var n8nResponse = await client.PostAsync("http://host.docker.internal:5678/webhook-test/ai-agent-orchestrator", content, cancellationToken);
-            
-            if (n8nResponse.IsSuccessStatusCode) 
-            {
-                return new NlqResponse 
-                { 
-                    Success = true, 
-                    Intent = "N8nOrquestador", 
-                    Message = "¡Conexión exitosa! Los datos llegaron a n8n." 
-                };
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error conectando a n8n: " + ex.Message);
         }
 
         var texto = pregunta.Trim().ToLowerInvariant();
