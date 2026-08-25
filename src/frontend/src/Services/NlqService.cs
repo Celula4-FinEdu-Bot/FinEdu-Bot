@@ -66,66 +66,79 @@ public sealed class NlqService
                     cancellationToken);
 
             // ====================================================
-            // SI HAY DATOS
+            // VALIDAR DATOS RECIBIDOS DEL MEF
             // ====================================================
 
-            if (datos.Count > 0)
+            var datosValidos =
+                datos
+                    .Where(x =>
+                        x.Pia != 0 ||
+                        x.Pim != 0 ||
+                        x.Devengado != 0)
+                    .ToList();
+
+            if (datosValidos.Count > 0)
             {
-                var datosValidos =
-                    datos
-                        .Where(x =>
-                            x.Pia != 0 ||
-                            x.Pim != 0 ||
-                            x.Devengado != 0)
+                var primerAnio =
+                    datosValidos.Min(x => x.Anio);
+
+                var ultimoAnio =
+                    datosValidos.Max(x => x.Anio);
+
+                // =================================================
+                // CONVERTIR MefEvolucionDto
+                // A EvolucionPresupuesto
+                // =================================================
+
+                var evolucion =
+                    datosValidos
+                        .Select(x =>
+                        {
+                            decimal porcentajeEjecucion = 0;
+
+                            if (x.Pim > 0)
+                            {
+                                porcentajeEjecucion =
+                                    (x.Devengado / x.Pim) * 100;
+                            }
+
+                            return new EvolucionPresupuesto
+                            {
+                                Anio = x.Anio,
+
+                                Entidad =
+                                    string.IsNullOrWhiteSpace(entidad)
+                                        ? null
+                                        : entidad,
+
+                                PresupuestoInicial =
+                                    x.Pia,
+
+                                PresupuestoModificado =
+                                    x.Pim,
+
+                                MontoEjecutado =
+                                    x.Devengado,
+
+                                PorcentajeEjecucion =
+                                    porcentajeEjecucion
+                            };
+                        })
                         .ToList();
 
-                if (datosValidos.Count > 0)
+                return new NlqResponse
                 {
-                    var primerAnio =
-                        datosValidos.Min(x => x.Anio);
+                    Success = true,
 
-                    var ultimoAnio =
-                        datosValidos.Max(x => x.Anio);
+                    Intent =
+                        "EvolucionPresupuesto",
 
-                    return new NlqResponse
-                    {
-                        Success = true,
+                    Message =
+                        $"Se encontraron datos presupuestarios para el período {primerAnio}-{ultimoAnio}.",
 
-                        Intent =
-                            "EvolucionPresupuesto",
-
-                        Message =
-                            $"Se encontraron datos presupuestarios para el período {primerAnio}-{ultimoAnio}.",
-
-                        Evolucion =
-                            datosValidos
-                                .Select(x =>
-                                {
-                                    var porcentaje =
-                                        x.Pim > 0
-                                            ? (x.Devengado / x.Pim) * 100
-                                            : 0;
-
-                                    return new EvolucionPresupuesto
-                                    {
-                                        Anio = x.Anio,
-
-                                        PresupuestoInicial =
-                                            x.Pia,
-
-                                        PresupuestoModificado =
-                                            x.Pim,
-
-                                        MontoEjecutado =
-                                            x.Devengado,
-
-                                        PorcentajeEjecucion =
-                                            porcentaje
-                                    };
-                                })
-                                .ToList()
-                    };
-                }
+                    Evolucion =
+                        evolucion
+                };
             }
 
             // ====================================================
@@ -257,15 +270,20 @@ public sealed class NlqService
         [
             "evolución",
             "evolucion",
+
             "presupuesto",
+
             "gasto",
             "gastos",
+
             "ejecución",
             "ejecucion",
+
             "presupuestaria",
             "presupuestario",
 
             "entre",
+
             "del",
             "de",
             "la",
@@ -288,8 +306,9 @@ public sealed class NlqService
             "2022-2026",
 
             "año",
-            "anos",
-            "años"
+            "ano",
+            "años",
+            "anos"
         ];
 
         foreach (var palabra in palabrasAEliminar)
@@ -301,7 +320,6 @@ public sealed class NlqService
                     StringComparison.OrdinalIgnoreCase);
         }
 
-        // Limpieza adicional
         texto =
             texto
                 .Replace("  ", " ")
