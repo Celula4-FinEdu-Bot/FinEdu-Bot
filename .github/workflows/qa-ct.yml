@@ -1,0 +1,67 @@
+name: CT - Pruebas Funcionales (Selenium + Pytest)
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  functional-tests:
+    name: Ejecutar suite de Selenium + Pytest (QA)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Verificar si existe la suite de pruebas de QA
+        id: check
+        run: |
+          if [ -d "qa" ] && find qa -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Aun no hay pruebas de Selenium/Pytest en el repositorio. Se omite CT."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configurar Python
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias (Selenium, Pytest)
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium pytest
+          if [ -f qa/requirements.txt ]; then pip install -r qa/requirements.txt; fi
+
+      - name: Instalar navegador (Chrome headless)
+        if: steps.check.outputs.exists == 'true'
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Levantar la aplicacion en segundo plano
+        if: steps.check.outputs.exists == 'true'
+        working-directory: src/frontend
+        run: |
+          npm ci --if-present
+          npm run build --if-present
+          npm run start --if-present &
+          sleep 10
+
+      - name: Ejecutar suite de Selenium + Pytest (configurada por QA)
+        if: steps.check.outputs.exists == 'true'
+        run: pytest qa/ -v --tb=short
+
+      - name: Publicar evidencia de resultados
+        if: steps.check.outputs.exists == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-selenium-pytest
+          path: qa/reports/
+          retention-days: 7
