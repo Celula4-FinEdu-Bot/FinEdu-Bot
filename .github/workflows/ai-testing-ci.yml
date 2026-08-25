@@ -62,7 +62,7 @@ jobs:
         if: steps.selenium.outputs.found == 'true'
         working-directory: src/frontend
         run: |
-          npm ci --if-present
+          npm install
           npm run build --if-present
           npm run start --if-present &
           sleep 10
