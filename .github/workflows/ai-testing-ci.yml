@@ -38,7 +38,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest requests pydantic
-          [ -f src/ia-ops/requirements.txt ] && pip install -r src/ia-ops/requirements.txt || true
+          if [ -f src/ia-ops/requirements.txt ]; then
+            pip install -r src/ia-ops/requirements.txt
+          fi
 
       - name: Detectar si hay pruebas de Selenium
         id: selenium
@@ -50,29 +52,21 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Instalar Selenium y navegador (solo si aplica)
+      - name: Instalar Selenium y navegador
         if: steps.selenium.outputs.found == 'true'
         run: pip install selenium
 
-      - name: Configurar Chrome headless (solo si aplica)
+      - name: Configurar Chrome headless
         if: steps.selenium.outputs.found == 'true'
         uses: browser-actions/setup-chrome@v1
 
-      - name: Levantar el frontend para pruebas de interfaz (solo si aplica)
-        if: steps.selenium.outputs.found == 'true'
-        working-directory: src/frontend
-        run: |
-          npm install
-          npm run build --if-present
-          npm run start --if-present &
-          sleep 10
-
-      - name: Ejecutar pruebas de QA (prompts, LLM y funcionales)
+      - name: Ejecutar pruebas de QA
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null || true)
+
           if [ -n "$TEST_FILES" ]; then
             pytest src/ia-ops/tests/ -v --tb=short
           else
