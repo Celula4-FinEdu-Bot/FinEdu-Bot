@@ -1,4 +1,3 @@
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -26,13 +25,15 @@ public sealed class MefService
     {
         _httpClient = httpClient;
 
-        // Evitamos que una consulta lenta del MEF sea cancelada
-        // demasiado rápido por el HttpClient.
-        _httpClient.Timeout = TimeSpan.FromSeconds(60);
+        // El endpoint del MEF puede ser lento.
+        // 120 segundos nos da margen, pero la consulta
+        // ahora estará filtrada por PLIEGO.
+        _httpClient.Timeout =
+            TimeSpan.FromSeconds(120);
     }
 
     // ============================================================
-    // EVOLUCIÓN PRESUPUESTARIA
+    // EVOLUCIÓN
     // ============================================================
 
     public async Task<List<MefEvolucionDto>> ObtenerEvolucionAsync(
@@ -41,135 +42,150 @@ public sealed class MefService
     {
         filtro = LimpiarFiltro(filtro);
 
+        Console.WriteLine();
         Console.WriteLine("======================================");
         Console.WriteLine("MEF - EVOLUCIÓN PRESUPUESTARIA");
         Console.WriteLine($"Filtro recibido: '{filtro}'");
         Console.WriteLine("======================================");
 
+        if (string.IsNullOrWhiteSpace(filtro))
+        {
+            Console.WriteLine(
+                "No se recibió una entidad para consultar MEF.");
+
+            return [];
+        }
+
         // --------------------------------------------------------
-        // IMPORTANTE:
-        // Primero intentamos 2022-2026.
-        // Si no encontramos nada, buscamos 2017-2021.
+        // 2022 - 2026
         // --------------------------------------------------------
 
-        var registros2022 = await BuscarRegistrosAsync(
-            Resource2022_2026,
-            filtro,
-            2022,
-            2026,
-            cancellationToken);
+        var resultado2022 =
+            await BuscarDatasetAsync(
+                Resource2022_2026,
+                filtro,
+                2022,
+                2026,
+                cancellationToken);
 
         Console.WriteLine(
-            $"MEF 2022-2026 -> {registros2022.Count} registros.");
+            $"MEF 2022-2026 -> {resultado2022.Count} registros.");
 
-        if (registros2022.Count > 0)
+        if (resultado2022.Count > 0)
         {
-            var resultado =
+            var evolucion =
                 ConstruirEvolucion(
-                    registros2022,
+                    resultado2022,
                     2022,
                     2026);
 
-            if (resultado.Any(TieneDatos))
+            if (evolucion.Any(TieneDatos))
             {
-                return resultado;
+                return evolucion;
             }
         }
 
-        Console.WriteLine(
-            "No hubo datos válidos en 2022-2026.");
-
         // --------------------------------------------------------
-        // SEGUNDO DATASET
+        // NO hacemos automáticamente 2017-2021 para una pregunta
+        // 2022-2026.
+        //
+        // Este método solo utiliza 2017-2021 si posteriormente
+        // se solicita explícitamente un período de ese rango.
         // --------------------------------------------------------
 
-        var registros2017 = await BuscarRegistrosAsync(
-            Resource2017_2021,
-            filtro,
-            2017,
-            2021,
-            cancellationToken);
-
         Console.WriteLine(
-            $"MEF 2017-2021 -> {registros2017.Count} registros.");
-
-        if (registros2017.Count > 0)
-        {
-            var resultado =
-                ConstruirEvolucion(
-                    registros2017,
-                    2017,
-                    2021);
-
-            if (resultado.Any(TieneDatos))
-            {
-                return resultado;
-            }
-        }
-
-        Console.WriteLine(
-            "No se encontraron datos en ninguno de los datasets.");
+            "No se encontraron datos válidos para 2022-2026.");
 
         return [];
     }
 
     // ============================================================
-    // BUSCAR REGISTROS
-    //
-    // NO UTILIZAMOS datastore_search_sql.
-    //
-    // Utilizamos el endpoint datastore_search que ya comprobaste
-    // que devuelve correctamente records.
+    // BUSCAR DATASET
     // ============================================================
 
     private async Task<List<Dictionary<string, JsonElement>>>
-        BuscarRegistrosAsync(
+        BuscarDatasetAsync(
             string resourceId,
-            string? filtro,
+            string filtro,
             int anioInicial,
             int anioFinal,
             CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(filtro))
-            {
-                Console.WriteLine(
-                    "Filtro vacío. No se ejecutará una consulta masiva.");
+            var entidad =
+                ResolverEntidad(filtro);
 
-                return [];
+            Console.WriteLine();
+            Console.WriteLine("--------------------------------------");
+            Console.WriteLine("MEF - RESOLUCIÓN DE ENTIDAD");
+            Console.WriteLine($"Filtro: {filtro}");
+            Console.WriteLine($"PLIEGO: {entidad.Pliego}");
+            Console.WriteLine($"Nombre MEF: {entidad.Nombre}");
+            Console.WriteLine("--------------------------------------");
+
+            // ====================================================
+            // CAMPOS
+            //
+            // Solamente solicitamos los campos que necesitamos.
+            // Esto reduce considerablemente el tamaño de respuesta.
+            // ====================================================
+
+            var fields = new List<string>
+            {
+                "_id",
+                "PLIEGO",
+                "PLIEGO_NOMBRE",
+                "EJECUTORA_NOMBRE"
+            };
+
+            for (
+                int anio = anioInicial;
+                anio <= anioFinal;
+                anio++)
+            {
+                fields.Add($"PIA_{anio}");
+                fields.Add($"PIM_{anio}");
+                fields.Add($"DEVENGADO_{anio}");
             }
 
-            var filtroNormalizado =
-                Normalizar(filtro);
+            var fieldsParam =
+                string.Join(",", fields);
 
-            Console.WriteLine(
-                $"Filtro normalizado: '{filtroNormalizado}'");
-
-            // ----------------------------------------------------
-            // IMPORTANTE
+            // ====================================================
+            // FILTRO EXACTO
             //
-            // datastore_search permite usar q.
+            // Para Ministerio de Defensa:
             //
-            // No descargamos millones de registros.
-            // Buscamos solamente coincidencias relacionadas con
-            // la entidad enviada por el usuario.
-            // ----------------------------------------------------
+            // filters={"PLIEGO":"026"}
+            //
+            // Esto es mucho mejor que:
+            //
+            // q=MINISTERIO DE DEFENSA
+            // ====================================================
 
-            const int limit = 100;
+            var filters =
+                JsonSerializer.Serialize(
+                    new Dictionary<string, string>
+                    {
+                        ["PLIEGO"] = entidad.Pliego
+                    });
 
             var url =
                 $"{BaseUrl}datastore_search" +
                 $"?resource_id={Uri.EscapeDataString(resourceId)}" +
-                $"&q={Uri.EscapeDataString(filtroNormalizado)}" +
-                $"&limit={limit}" +
+                $"&filters={Uri.EscapeDataString(filters)}" +
+                $"&fields={Uri.EscapeDataString(fieldsParam)}" +
+                $"&limit=1000" +
                 $"&offset=0";
 
+            Console.WriteLine();
             Console.WriteLine("--------------------------------------");
-            Console.WriteLine("MEF - DATASTORE SEARCH");
+            Console.WriteLine("MEF - DATASTORE SEARCH OPTIMIZADO");
             Console.WriteLine($"Dataset: {resourceId}");
-            Console.WriteLine($"Filtro: {filtroNormalizado}");
-            Console.WriteLine($"URL: {url}");
+            Console.WriteLine($"Filtro API: PLIEGO={entidad.Pliego}");
+            Console.WriteLine($"Entidad: {entidad.Nombre}");
+            Console.WriteLine($"Años: {anioInicial}-{anioFinal}");
             Console.WriteLine("--------------------------------------");
 
             using var response =
@@ -187,7 +203,7 @@ public sealed class MefService
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine(
-                    "Respuesta de error del MEF:");
+                    "El MEF respondió con error:");
 
                 Console.WriteLine(json);
 
@@ -198,24 +214,9 @@ public sealed class MefService
                 ExtraerRegistros(json);
 
             Console.WriteLine(
-                $"Registros recibidos: {registros.Count}");
+                $"Registros recibidos del MEF: {registros.Count}");
 
-            // ----------------------------------------------------
-            // datastore_search q hace una búsqueda general.
-            //
-            // Por seguridad hacemos una segunda validación local
-            // sobre los campos que realmente nos interesan.
-            // ----------------------------------------------------
-
-            var filtrados =
-                FiltrarPorEntidad(
-                    registros,
-                    filtroNormalizado);
-
-            Console.WriteLine(
-                $"Registros después del filtro local: {filtrados.Count}");
-
-            return filtrados;
+            return registros;
         }
         catch (OperationCanceledException ex)
         {
@@ -227,21 +228,168 @@ public sealed class MefService
         catch (HttpRequestException ex)
         {
             Console.WriteLine(
-                $"Error HTTP consultando MEF: {ex.Message}");
+                $"Error HTTP MEF: {ex.Message}");
 
             return [];
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"Error general consultando MEF: {ex}");
+                $"Error consultando MEF: {ex}");
 
             return [];
         }
     }
 
     // ============================================================
-    // EXTRAER RECORDS
+    // RESOLVER ENTIDAD
+    // ============================================================
+
+    private static MefEntidad ResolverEntidad(
+    string filtro)
+{
+    var normalizado =
+        Normalizar(filtro);
+
+    // ============================================================
+    // DEFENSA
+    // PLIEGO 026
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE DEFENSA") ||
+        normalizado == "DEFENSA" ||
+        normalizado.Contains(
+            "M DE DEFENSA"))
+    {
+        return new MefEntidad
+        {
+            Pliego = "026",
+            Nombre = "M. DE DEFENSA"
+        };
+    }
+
+    // ============================================================
+    // SALUD
+    // PLIEGO 011
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE SALUD") ||
+        normalizado == "SALUD" ||
+        normalizado.Contains(
+            "M DE SALUD"))
+    {
+        return new MefEntidad
+        {
+            Pliego = "011",
+            Nombre = "M. DE SALUD"
+        };
+    }
+
+    // ============================================================
+    // EDUCACIÓN
+    // PLIEGO 010
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE EDUCACION") ||
+        normalizado == "EDUCACION")
+    {
+        return new MefEntidad
+        {
+            Pliego = "010",
+            Nombre = "M. DE EDUCACION"
+        };
+    }
+
+    // ============================================================
+    // ECONOMÍA
+    // PLIEGO 009
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE ECONOMIA") ||
+        normalizado.Contains(
+            "ECONOMIA Y FINANZAS"))
+    {
+        return new MefEntidad
+        {
+            Pliego = "009",
+            Nombre = "M. DE ECONOMIA Y FINANZAS"
+        };
+    }
+
+    // ============================================================
+    // INTERIOR
+    // PLIEGO 007
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DEL INTERIOR") ||
+        normalizado == "INTERIOR")
+    {
+        return new MefEntidad
+        {
+            Pliego = "007",
+            Nombre = "M. DEL INTERIOR"
+        };
+    }
+
+    // ============================================================
+    // TRANSPORTES
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE TRANSPORTES") ||
+        normalizado.Contains(
+            "TRANSPORTES Y COMUNICACIONES"))
+    {
+        return new MefEntidad
+        {
+            Pliego = "036",
+            Nombre =
+                "M. DE TRANSPORTES Y COMUNICACIONES"
+        };
+    }
+
+    // ============================================================
+    // MIDIS
+    // ============================================================
+
+    if (
+        normalizado.Contains(
+            "MINISTERIO DE DESARROLLO E INCLUSION SOCIAL") ||
+        normalizado.Contains(
+            "DESARROLLO E INCLUSION SOCIAL"))
+    {
+        return new MefEntidad
+        {
+            Pliego = "040",
+            Nombre =
+                "MINISTERIO DE DESARROLLO E INCLUSION SOCIAL"
+        };
+    }
+
+    // ============================================================
+    // DESCONOCIDO
+    // ============================================================
+
+    return new MefEntidad
+    {
+        Pliego = "",
+        Nombre = filtro
+    };
+}
+
+    // ============================================================
+    // EXTRAER REGISTROS
     // ============================================================
 
     private static List<Dictionary<string, JsonElement>>
@@ -255,37 +403,31 @@ public sealed class MefService
             var root =
                 document.RootElement;
 
-            // ----------------------------------------------------
-            // Formato real:
-            //
-            // {
-            //   "records": [...],
-            //   "result": {...}
-            // }
-            // ----------------------------------------------------
-
             if (!root.TryGetProperty(
                     "records",
                     out var records))
             {
                 Console.WriteLine(
-                    "La respuesta MEF no contiene 'records'.");
+                    "La respuesta MEF no contiene records.");
 
                 return [];
             }
 
             var resultado =
-                new List<Dictionary<string, JsonElement>>();
+                new List<
+                    Dictionary<string, JsonElement>>();
 
-            foreach (var record
-                     in records.EnumerateArray())
+            foreach (
+                var record
+                in records.EnumerateArray())
             {
                 var diccionario =
                     new Dictionary<string, JsonElement>(
                         StringComparer.OrdinalIgnoreCase);
 
-                foreach (var propiedad
-                         in record.EnumerateObject())
+                foreach (
+                    var propiedad
+                    in record.EnumerateObject())
                 {
                     diccionario[propiedad.Name] =
                         propiedad.Value.Clone();
@@ -299,77 +441,10 @@ public sealed class MefService
         catch (JsonException ex)
         {
             Console.WriteLine(
-                $"JSON inválido recibido del MEF: {ex.Message}");
+                $"JSON inválido del MEF: {ex.Message}");
 
             return [];
         }
-    }
-
-    // ============================================================
-    // FILTRAR ENTIDAD
-    // ============================================================
-
-    private static List<Dictionary<string, JsonElement>>
-        FiltrarPorEntidad(
-            List<Dictionary<string, JsonElement>> registros,
-            string filtro)
-    {
-        if (string.IsNullOrWhiteSpace(filtro))
-        {
-            return registros;
-        }
-
-        var resultado =
-            new List<Dictionary<string, JsonElement>>();
-
-        foreach (var registro in registros)
-        {
-            var camposBusqueda = new[]
-            {
-                ObtenerTexto(
-                    registro,
-                    "EJECUTORA_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "PLIEGO_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "NIVEL_GOBIERNO_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "DEPARTAMENTO_EJECUTORA_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "PROVINCIA_EJECUTORA_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "DISTRITO_EJECUTORA_NOMBRE"),
-
-                ObtenerTexto(
-                    registro,
-                    "SECTOR_NOMBRE")
-            };
-
-            var coincide =
-                camposBusqueda.Any(
-                    campo =>
-                        !string.IsNullOrWhiteSpace(campo) &&
-                        Normalizar(campo).Contains(
-                            filtro,
-                            StringComparison.OrdinalIgnoreCase));
-
-            if (coincide)
-            {
-                resultado.Add(registro);
-            }
-        }
-
-        return resultado;
     }
 
     // ============================================================
@@ -416,7 +491,7 @@ public sealed class MefService
     }
 
     // ============================================================
-    // SUMAR CAMPO
+    // SUMAR
     // ============================================================
 
     private static decimal SumarCampo(
@@ -450,17 +525,20 @@ public sealed class MefService
     {
         try
         {
-            if (valor.ValueKind ==
+            if (
+                valor.ValueKind ==
                 JsonValueKind.Number)
             {
-                if (valor.TryGetDecimal(
+                if (
+                    valor.TryGetDecimal(
                         out var numero))
                 {
                     return numero;
                 }
             }
 
-            if (valor.ValueKind ==
+            if (
+                valor.ValueKind ==
                 JsonValueKind.String)
             {
                 var texto =
@@ -476,7 +554,8 @@ public sealed class MefService
                         .Replace(",", "")
                         .Trim();
 
-                if (decimal.TryParse(
+                if (
+                    decimal.TryParse(
                         texto,
                         NumberStyles.Any,
                         CultureInfo.InvariantCulture,
@@ -488,34 +567,10 @@ public sealed class MefService
         }
         catch
         {
-            // Se interpreta como 0.
+            // 0
         }
 
         return 0;
-    }
-
-    // ============================================================
-    // OBTENER TEXTO
-    // ============================================================
-
-    private static string ObtenerTexto(
-        Dictionary<string, JsonElement> registro,
-        string campo)
-    {
-        if (!registro.TryGetValue(
-                campo,
-                out var valor))
-        {
-            return "";
-        }
-
-        if (valor.ValueKind ==
-            JsonValueKind.String)
-        {
-            return valor.GetString() ?? "";
-        }
-
-        return valor.ToString();
     }
 
     // ============================================================
@@ -532,18 +587,15 @@ public sealed class MefService
     }
 
     // ============================================================
-    // LIMPIAR FILTRO
+    // LIMPIAR
     // ============================================================
 
     private static string LimpiarFiltro(
         string? filtro)
     {
-        if (string.IsNullOrWhiteSpace(filtro))
-        {
-            return "";
-        }
-
-        return filtro.Trim();
+        return string.IsNullOrWhiteSpace(filtro)
+            ? ""
+            : filtro.Trim();
     }
 
     // ============================================================
@@ -558,24 +610,52 @@ public sealed class MefService
             return "";
         }
 
-        return texto
-            .Trim()
-            .ToUpperInvariant()
-            .Normalize(NormalizationForm.FormD)
-            .Where(
-                c =>
-                    CharUnicodeInfo.GetUnicodeCategory(c)
-                    != UnicodeCategory.NonSpacingMark)
-            .Aggregate(
-                new StringBuilder(),
-                (sb, c) => sb.Append(c))
-            .ToString()
-            .Normalize(NormalizationForm.FormC);
+        var textoNormalizado =
+            texto
+                .Trim()
+                .ToUpperInvariant()
+                .Normalize(
+                    NormalizationForm.FormD);
+
+        var sb =
+            new StringBuilder();
+
+        foreach (var caracter
+                 in textoNormalizado)
+        {
+            var categoria =
+                CharUnicodeInfo.GetUnicodeCategory(
+                    caracter);
+
+            if (
+                categoria !=
+                UnicodeCategory.NonSpacingMark)
+            {
+                sb.Append(caracter);
+            }
+        }
+
+        return
+            sb
+                .ToString()
+                .Normalize(
+                    NormalizationForm.FormC);
     }
 }
 
 // ================================================================
-// DTO
+// ENTIDAD MEF
+// ================================================================
+
+public sealed class MefEntidad
+{
+    public string Pliego { get; set; } = "";
+
+    public string Nombre { get; set; } = "";
+}
+
+// ================================================================
+// DTO EVOLUCIÓN
 // ================================================================
 
 public sealed class MefEvolucionDto

@@ -326,17 +326,49 @@ private static string ExtraerEntidad(
     var texto =
         pregunta.Trim();
 
-    // ------------------------------------------------------------
-    // Primero quitamos frases completas de la consulta.
-    // No eliminamos palabras como "de", porque pueden formar
-    // parte del nombre real de una entidad.
-    // ------------------------------------------------------------
+    // ============================================================
+    // NORMALIZAMOS PARA PODER DETECTAR LA ESTRUCTURA
+    // ============================================================
+
+    var normalizado =
+        NormalizarTexto(texto);
+
+    // ============================================================
+    // CASOS CONOCIDOS
+    //
+    // Es preferible devolver el nombre completo de la entidad.
+    // MefService posteriormente lo convierte a PLIEGO.
+    // ============================================================
+
+    string[] entidades =
+    [
+        "ministerio de defensa",
+        "ministerio de salud",
+        "ministerio de educacion",
+        "ministerio de economia y finanzas",
+        "ministerio del interior",
+        "ministerio de transportes y comunicaciones",
+        "ministerio de desarrollo e inclusion social"
+    ];
+
+    foreach (var entidad in entidades)
+    {
+        if (
+            normalizado.Contains(
+                entidad,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return entidad;
+        }
+    }
+
+    // ============================================================
+    // SI NO ENCONTRAMOS UNA ENTIDAD CONOCIDA,
+    // usamos la extracción anterior como fallback.
+    // ============================================================
 
     string[] frasesAEliminar =
     [
-        "¿cuál fue la evolución del presupuesto",
-        "¿cual fue la evolucion del presupuesto",
-
         "cuál fue la evolución del presupuesto",
         "cual fue la evolucion del presupuesto",
 
@@ -370,7 +402,8 @@ private static string ExtraerEntidad(
         "gasto"
     ];
 
-    foreach (var frase in frasesAEliminar)
+    foreach (var frase
+             in frasesAEliminar)
     {
         texto =
             texto.Replace(
@@ -379,11 +412,14 @@ private static string ExtraerEntidad(
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    // ------------------------------------------------------------
-    // Eliminamos los años.
-    // ------------------------------------------------------------
+    // ============================================================
+    // QUITAMOS AÑOS
+    // ============================================================
 
-    for (int anio = 2017; anio <= 2026; anio++)
+    for (
+        int anio = 2017;
+        anio <= 2026;
+        anio++)
     {
         texto =
             texto.Replace(
@@ -392,11 +428,9 @@ private static string ExtraerEntidad(
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    // ------------------------------------------------------------
-    // Eliminamos palabras de estructura temporal.
-    //
-    // NO eliminamos "de", "del", "la", etc.
-    // ------------------------------------------------------------
+    // ============================================================
+    // PALABRAS TEMPORALES
+    // ============================================================
 
     string[] palabrasTemporales =
     [
@@ -409,7 +443,8 @@ private static string ExtraerEntidad(
         "anos"
     ];
 
-    foreach (var palabra in palabrasTemporales)
+    foreach (var palabra
+             in palabrasTemporales)
     {
         texto =
             texto.Replace(
@@ -418,9 +453,9 @@ private static string ExtraerEntidad(
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    // ------------------------------------------------------------
-    // Limpieza final
-    // ------------------------------------------------------------
+    // ============================================================
+    // LIMPIEZA
+    // ============================================================
 
     texto =
         texto
@@ -429,12 +464,21 @@ private static string ExtraerEntidad(
             .Replace(",", " ")
             .Replace(".", " ")
             .Replace(":", " ")
-            .Replace("-", " ")
-            .Replace("  ", " ")
-            .Trim();
+            .Replace("-", " ");
 
-    return texto;
+    while (
+        texto.Contains(
+            "  ",
+            StringComparison.Ordinal))
+    {
+        texto =
+            texto.Replace(
+                "  ",
+                " ",
+                StringComparison.Ordinal);
+    }
+
+    return texto.Trim();
 }
-
 
 }
