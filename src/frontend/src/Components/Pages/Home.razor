@@ -3,7 +3,6 @@
 
 @using src.Models
 @using src.Services
-@using System.Reflection
 @using System.Globalization
 @using Microsoft.AspNetCore.Components.Web
 
@@ -13,10 +12,17 @@
 
 <div class="page-container">
 
+    <!-- ====================================================== -->
     <!-- ENCABEZADO -->
+    <!-- ====================================================== -->
+
     <div class="page-header">
+
         <div>
-            <span class="eyebrow">FINEDU-BOT</span>
+
+            <span class="eyebrow">
+                FINEDU-BOT
+            </span>
 
             <h1>
                 Monitor de Transparencia
@@ -25,18 +31,29 @@
             </h1>
 
             <p class="subtitle">
-                Consulta información presupuestaria del MEF utilizando lenguaje natural.
+                Consulta información presupuestaria del MEF
+                utilizando lenguaje natural.
             </p>
+
         </div>
+
     </div>
 
+
+    <!-- ====================================================== -->
     <!-- CONTENEDOR PRINCIPAL -->
+    <!-- ====================================================== -->
+
     <div class="query-card">
 
+        <!-- ================================================== -->
         <!-- CABECERA -->
+        <!-- ================================================== -->
+
         <div class="query-header">
 
             <div>
+
                 <span class="section-label">
                     NATURAL LANGUAGE QUERY
                 </span>
@@ -44,6 +61,7 @@
                 <h2>
                     ¿Qué deseas consultar?
                 </h2>
+
             </div>
 
             <div class="source-badge">
@@ -52,7 +70,11 @@
 
         </div>
 
+
+        <!-- ================================================== -->
         <!-- FORMULARIO -->
+        <!-- ================================================== -->
+
         <div class="query-form">
 
             <input
@@ -62,34 +84,38 @@
                 @bind:event="oninput"
                 @onkeydown="HandleKeyDown"
                 placeholder="Ej. ¿Cuál fue la evolución del presupuesto entre 2022 y 2026?"
-                />
+            />
 
             <button
                 type="button"
                 class="query-button"
-                @onclick="ConsultarAsync"
-                >
+                disabled="@Cargando"
+                @onclick="ConsultarAsync">
 
                 @if (Cargando)
                 {
                     <span class="spinner"></span>
-                    <span>Consultando...</span>
+
+                    <span>
+                        Consultando...
+                    </span>
                 }
                 else
                 {
-                    <span>Consultar</span>
+                    <span>
+                        Consultar
+                    </span>
                 }
 
             </button>
-            <button type="button" @onclick="ProbarBoton">
-                PROBAR BLAZOR
-            </button>
-
-            <p>Contador: @contador</p>
 
         </div>
 
+
+        <!-- ================================================== -->
         <!-- EJEMPLOS -->
+        <!-- ================================================== -->
+
         <div class="examples">
 
             <span class="examples-title">
@@ -125,13 +151,22 @@
 
         </div>
 
+
+        <!-- ================================================== -->
         <!-- RESULTADO -->
+        <!-- ================================================== -->
+
         @if (Resultado != null)
         {
+
+            <!-- ============================================== -->
             <!-- RESUMEN -->
+            <!-- ============================================== -->
+
             <div class="summary-grid">
 
                 <!-- INTENCIÓN -->
+
                 <div class="summary-card">
 
                     <span class="summary-label">
@@ -139,21 +174,28 @@
                     </span>
 
                     <strong>
-                        @(string.IsNullOrWhiteSpace(Resultado.Intent)
+
+                        @(string.IsNullOrWhiteSpace(
+                            Resultado.Intent)
                             ? "No identificada"
                             : Resultado.Intent)
+
                     </strong>
 
                 </div>
 
+
                 <!-- ESTADO -->
+
                 <div class="summary-card">
 
                     <span class="summary-label">
                         ESTADO
                     </span>
 
-                    <strong class="@(Resultado.Success ? "success" : "error")">
+                    <strong class="@(Resultado.Success
+                        ? "success"
+                        : "error")">
 
                         @(Resultado.Success
                             ? "ÉXITO"
@@ -163,7 +205,9 @@
 
                 </div>
 
+
                 <!-- FUENTE -->
+
                 <div class="summary-card">
 
                     <span class="summary-label">
@@ -178,23 +222,38 @@
 
             </div>
 
+
+            <!-- ============================================== -->
             <!-- MENSAJE -->
-            @if (!string.IsNullOrWhiteSpace(Resultado.Message))
+            <!-- ============================================== -->
+
+            @if (!string.IsNullOrWhiteSpace(
+                Resultado.Message))
             {
-                <div class="message-box @(Resultado.Success ? "message-success" : "message-warning")">
+
+                <div class="message-box @(Resultado.Success
+                    ? "message-success"
+                    : "message-warning")">
 
                     @Resultado.Message
 
                 </div>
+
             }
 
+
+            <!-- ============================================== -->
             <!-- RESULTADOS -->
+            <!-- ============================================== -->
+
             @if (Resultado.Evolucion != null &&
                  Resultado.Evolucion.Any())
             {
+
                 <div class="results-container">
 
-                    <!-- CABECERA RESULTADOS -->
+                    <!-- CABECERA -->
+
                     <div class="results-header">
 
                         <div>
@@ -204,7 +263,10 @@
                             </span>
 
                             <h3>
-                                Evolución presupuestaria 2022-2026
+                                Evolución presupuestaria
+                                @Resultado.Evolucion.Min(x => x.Anio)
+                                -
+                                @Resultado.Evolucion.Max(x => x.Anio)
                             </h3>
 
                         </div>
@@ -215,79 +277,142 @@
 
                     </div>
 
+
                     <!-- TABLA -->
+
                     <div class="table-wrapper">
 
                         <table class="results-table">
 
-    <thead>
-        <tr>
-            <th>AÑO</th>
-            <th>ENTIDAD</th>
-            <th>PIA</th>
-            <th>PIM</th>
-            <th>DEVENGADO</th>
-            <th>% EJECUCIÓN</th>
-        </tr>
-    </thead>
+                            <thead>
 
-    <tbody>
+                                <tr>
 
-        @foreach (var registro in Resultado.Evolucion)
-        {
-            <tr>
+                                    <th>
+                                        AÑO
+                                    </th>
 
-                <td>
-                    @registro.Anio
-                </td>
+                                    <th>
+                                        ENTIDAD
+                                    </th>
 
-                <td class="entity-cell">
-                    @(string.IsNullOrWhiteSpace(registro.Entidad)
-                        ? "-"
-                        : registro.Entidad)
-                </td>
+                                    <th>
+                                        PIA
+                                    </th>
 
-                <td>
-                    S/
-                    @registro.PresupuestoInicial.ToString(
-                        "N2",
-                        new CultureInfo("es-PE"))
-                </td>
+                                    <th>
+                                        PIM
+                                    </th>
 
-                <td>
-                    S/
-                    @registro.PresupuestoModificado.ToString(
-                        "N2",
-                        new CultureInfo("es-PE"))
-                </td>
+                                    <th>
+                                        DEVENGADO
+                                    </th>
 
-                <td>
-                    S/
-                    @registro.MontoEjecutado.ToString(
-                        "N2",
-                        new CultureInfo("es-PE"))
-                </td>
+                                    <th>
+                                        % EJECUCIÓN
+                                    </th>
 
-                <td>
-                    @registro.PorcentajeEjecucion.ToString(
-                        "N2",
-                        new CultureInfo("es-PE"))%
-                </td>
+                                </tr>
 
-            </tr>
-        }
+                            </thead>
 
-    </tbody>
 
-</table>
+                            <tbody>
+
+                                @foreach (
+                                    var registro
+                                    in Resultado.Evolucion)
+                                {
+
+                                    <tr>
+
+                                        <td>
+                                            @registro.Anio
+                                        </td>
+
+
+                                        <td class="entity-cell">
+
+                                            @(string.IsNullOrWhiteSpace(
+                                                registro.Entidad)
+                                                ? "Todas las entidades"
+                                                : registro.Entidad)
+
+                                        </td>
+
+
+                                        <td>
+
+                                            S/
+                                            @registro
+                                                .PresupuestoInicial
+                                                .ToString(
+                                                    "N2",
+                                                    new CultureInfo(
+                                                        "es-PE"))
+
+                                        </td>
+
+
+                                        <td>
+
+                                            S/
+                                            @registro
+                                                .PresupuestoModificado
+                                                .ToString(
+                                                    "N2",
+                                                    new CultureInfo(
+                                                        "es-PE"))
+
+                                        </td>
+
+
+                                        <td>
+
+                                            S/
+                                            @registro
+                                                .MontoEjecutado
+                                                .ToString(
+                                                    "N2",
+                                                    new CultureInfo(
+                                                        "es-PE"))
+
+                                        </td>
+
+
+                                        <td>
+
+                                            @registro
+                                                .PorcentajeEjecucion
+                                                .ToString(
+                                                    "N2",
+                                                    new CultureInfo(
+                                                        "es-PE"))
+
+                                            %
+
+                                        </td>
+
+                                    </tr>
+
+                                }
+
+                            </tbody>
+
+                        </table>
 
                     </div>
 
                 </div>
+
             }
-            else if (!Cargando && ConsultaRealizada)
+            else if (!Cargando &&
+                     ConsultaRealizada)
             {
-                <!-- SIN DATOS -->
+
+                <!-- ========================================== -->
+                <!-- SIN RESULTADOS -->
+                <!-- ========================================== -->
 
                 <div class="no-results">
 
@@ -302,14 +427,16 @@
                         </h3>
 
                         <p>
-                            El MEF no devolvió registros para la consulta realizada.
-                            Verifica el nombre de la entidad o realiza una consulta
-                            para el período 2022-2026.
+                            El MEF no devolvió registros para
+                            la consulta realizada.
+                            Verifica el nombre de la entidad
+                            o realiza una consulta presupuestaria.
                         </p>
 
                     </div>
 
                 </div>
+
             }
 
         }
@@ -318,54 +445,69 @@
 
 </div>
 
-@code {
-    private int contador = 0;
 
-    private void ProbarBoton()
-    {
-        contador++;
-    }
+@code {
+
+    // ==========================================================
+    // ESTADO
+    // ==========================================================
 
     private string Pregunta =
         "¿Cuál fue la evolución del presupuesto entre 2022 y 2026?";
 
     private NlqResponse? Resultado;
 
-    private bool Cargando = false;
+    private bool Cargando;
 
-    private bool ConsultaRealizada = false;
+    private bool ConsultaRealizada;
 
+
+    // ==========================================================
+    // CONSULTAR
+    // ==========================================================
 
     private async Task ConsultarAsync()
     {
         if (Cargando)
+        {
             return;
+        }
 
         if (string.IsNullOrWhiteSpace(Pregunta))
+        {
             return;
+        }
 
         Cargando = true;
+
         ConsultaRealizada = false;
+
         Resultado = null;
 
         try
         {
-            Resultado = await NlqService.ProcesarAsync(
-                Pregunta.Trim(),
-                CancellationToken.None
-            );
+            Resultado =
+                await NlqService.ProcesarAsync(
+                    Pregunta.Trim(),
+                    CancellationToken.None);
 
             ConsultaRealizada = true;
         }
         catch (Exception ex)
         {
-            Resultado = new NlqResponse
-            {
-                Success = false,
-                Intent = "Error",
-                Message = $"No fue posible procesar la consulta: {ex.Message}",
-                Evolucion = []
-            };
+            Resultado =
+                new NlqResponse
+                {
+                    Success = false,
+
+                    Intent =
+                        "Error",
+
+                    Message =
+                        $"No fue posible procesar la consulta: {ex.Message}",
+
+                    Evolucion = []
+                };
 
             ConsultaRealizada = true;
         }
@@ -375,6 +517,10 @@
         }
     }
 
+
+    // ==========================================================
+    // ENTER
+    // ==========================================================
 
     private async Task HandleKeyDown(
         KeyboardEventArgs e)
@@ -386,69 +532,18 @@
     }
 
 
-    private void UsarEjemplo(string texto)
+    // ==========================================================
+    // USAR EJEMPLO
+    // ==========================================================
+
+    private void UsarEjemplo(
+        string texto)
     {
         Pregunta = texto;
-    }
 
+        Resultado = null;
 
-    private static string GetValue(
-        object? objeto,
-        params string[] nombres)
-    {
-        if (objeto == null)
-            return "-";
-
-        var tipo = objeto.GetType();
-
-        foreach (var nombre in nombres)
-        {
-            var propiedad = tipo.GetProperty(
-                nombre,
-                BindingFlags.Public |
-                BindingFlags.Instance |
-                BindingFlags.IgnoreCase
-            );
-
-            if (propiedad == null)
-                continue;
-
-            var valor = propiedad.GetValue(objeto);
-
-            if (valor == null)
-                continue;
-
-            var texto = valor.ToString();
-
-            if (!string.IsNullOrWhiteSpace(texto))
-                return texto;
-        }
-
-        return "-";
-    }
-
-
-    private static string FormatMoney(string valor)
-    {
-        if (string.IsNullOrWhiteSpace(valor) ||
-            valor == "-")
-        {
-            return "-";
-        }
-
-        if (decimal.TryParse(
-            valor,
-            NumberStyles.Any,
-            CultureInfo.InvariantCulture,
-            out var numero))
-        {
-            return numero.ToString(
-                "N2",
-                new CultureInfo("es-PE")
-            );
-        }
-
-        return valor;
+        ConsultaRealizada = false;
     }
 
 }
