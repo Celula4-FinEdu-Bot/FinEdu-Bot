@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 
-
 namespace src.Models;
 
 public class NlqResponse
@@ -14,17 +13,15 @@ public class NlqResponse
     [JsonPropertyName("message")]
     public string? Message { get; set; }
 
-    // Para la nueva funcionalidad
     [JsonPropertyName("evolucion")]
-    public List<EvolucionPresupuesto>? Evolucion { get; set; }
+    public List<EvolucionPresupuesto> Evolucion { get; set; } = [];
 
-    // Para compatibilidad con el componente existente
     [JsonPropertyName("presupuestos")]
-    public List<PresupuestoResumen>? Presupuestos { get; set; }
+    public List<PresupuestoResumen> Presupuestos { get; set; } = [];
 
     [JsonPropertyName("proyectos")]
-    public List<Proyecto>? Proyectos { get; set; }
+    public List<Proyecto> Proyectos { get; set; } = [];
 
     [JsonPropertyName("contrataciones")]
-    public List<Contratacion>? Contrataciones { get; set; }
+    public List<Contratacion> Contrataciones { get; set; } = [];
 }

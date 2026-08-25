@@ -20,52 +20,160 @@ public sealed class NlqService
             return new NlqResponse
             {
                 Success = false,
-                Message = "Escribe una consulta. Ejemplo: ¿Cuál fue la evolución del presupuesto entre 2012 y 2016?"
+                Intent = "NoReconocido",
+                Message = "Escribe una consulta."
             };
         }
 
-        var texto = pregunta.Trim().ToLowerInvariant();
+        var texto =
+            NormalizarTexto(pregunta);
 
-        if (ContieneAlguno(texto, "evolución",         
-        "evolucion del presupuesto",
-                "presupuesto por año",
+        // ========================================================
+        // EVOLUCIÓN PRESUPUESTARIA
+        // ========================================================
+
+        if (ContieneAlguno(
+                texto,
+                "evolucion",
+                "presupuesto por ano",
                 "presupuesto anual",
-                "ejecución por año",
-                "ejecucion por año"))
-    {
-        var entidad = ExtraerEntidad(texto);
-        var datos = await _mefService.ObtenerEvolucionAsync(entidad, cancellationToken);
-        
-        // Convertir a PresupuestoResumen
-        var resumen = _mefService.ConvertirEvolucionAResumen(datos);
-
-        return new NlqResponse
+                "ejecucion por ano",
+                "evolucion del presupuesto",
+                "presupuesto entre",
+                "presupuesto 2017",
+                "presupuesto 2018",
+                "presupuesto 2019",
+                "presupuesto 2020",
+                "presupuesto 2021",
+                "presupuesto 2022",
+                "presupuesto 2023",
+                "presupuesto 2024",
+                "presupuesto 2025",
+                "presupuesto 2026"))
         {
-            Success = true,
-            Intent = "EvolucionPresupuesto",
-            Message = "...",
-            Presupuestos = resumen  // Usa la propiedad Presupuestos en lugar de Evolucion
-        };
-    }
+            var entidad =
+                ExtraerEntidad(pregunta);
+
+            Console.WriteLine("======================================");
+            Console.WriteLine("NLQ - EVOLUCIÓN");
+            Console.WriteLine($"Pregunta: {pregunta}");
+            Console.WriteLine($"Filtro entidad: {entidad}");
+            Console.WriteLine("======================================");
+
+            var datos =
+                await _mefService.ObtenerEvolucionAsync(
+                    entidad,
+                    cancellationToken);
+
+            // ====================================================
+            // SI HAY DATOS
+            // ====================================================
+
+            if (datos.Count > 0)
+            {
+                var datosValidos =
+                    datos
+                        .Where(x =>
+                            x.Pia != 0 ||
+                            x.Pim != 0 ||
+                            x.Devengado != 0)
+                        .ToList();
+
+                if (datosValidos.Count > 0)
+                {
+                    var primerAnio =
+                        datosValidos.Min(x => x.Anio);
+
+                    var ultimoAnio =
+                        datosValidos.Max(x => x.Anio);
+
+                    return new NlqResponse
+                    {
+                        Success = true,
+
+                        Intent =
+                            "EvolucionPresupuesto",
+
+                        Message =
+                            $"Se encontraron datos presupuestarios para el período {primerAnio}-{ultimoAnio}.",
+
+                        Evolucion =
+                            datosValidos
+                                .Select(x =>
+                                {
+                                    var porcentaje =
+                                        x.Pim > 0
+                                            ? (x.Devengado / x.Pim) * 100
+                                            : 0;
+
+                                    return new EvolucionPresupuesto
+                                    {
+                                        Anio = x.Anio,
+
+                                        PresupuestoInicial =
+                                            x.Pia,
+
+                                        PresupuestoModificado =
+                                            x.Pim,
+
+                                        MontoEjecutado =
+                                            x.Devengado,
+
+                                        PorcentajeEjecucion =
+                                            porcentaje
+                                    };
+                                })
+                                .ToList()
+                    };
+                }
+            }
+
+            // ====================================================
+            // SIN DATOS
+            // ====================================================
+
+            return new NlqResponse
+            {
+                Success = false,
+
+                Intent =
+                    "EvolucionPresupuesto",
+
+                Message =
+                    "No se encontraron datos en los datasets del MEF para la consulta realizada.",
+
+                Evolucion =
+                    []
+            };
+        }
+
+        // ========================================================
+        // PROYECTOS
+        // ========================================================
 
         if (ContieneAlguno(
                 texto,
                 "proyectos",
                 "proyecto",
-                "categorías",
                 "categorias",
                 "mayor presupuesto",
-                "mayor ejecución",
                 "mayor ejecucion"))
         {
             return new NlqResponse
             {
                 Success = true,
-                Intent = "Proyectos",
+
+                Intent =
+                    "Proyectos",
+
                 Message =
                     "La consulta corresponde al análisis de proyectos y categorías presupuestarias."
             };
         }
+
+        // ========================================================
+        // CONTRATACIONES
+        // ========================================================
 
         if (ContieneAlguno(
                 texto,
@@ -77,81 +185,129 @@ public sealed class NlqService
             return new NlqResponse
             {
                 Success = true,
-                Intent = "Contrataciones",
+
+                Intent =
+                    "Contrataciones",
+
                 Message =
                     "Esta consulta debe ser atendida por el microfrontend OECE."
             };
         }
 
+        // ========================================================
+        // NO RECONOCIDO
+        // ========================================================
+
         return new NlqResponse
         {
             Success = false,
-            Intent = "NoReconocido",
+
+            Intent =
+                "NoReconocido",
+
             Message =
-                "No pude identificar la consulta. Prueba con: " +
-                "\"¿Cuál fue la evolución del presupuesto entre 2012 y 2016?\""
+                "No pude identificar la consulta. " +
+                "Prueba con: \"¿Cuál fue la evolución del presupuesto entre 2022 y 2026?\""
         };
     }
+
+    // ============================================================
+    // DETECTAR PALABRAS
+    // ============================================================
 
     private static bool ContieneAlguno(
         string texto,
         params string[] valores)
     {
-        return valores.Any(texto.Contains);
+        return valores.Any(
+            valor =>
+                texto.Contains(
+                    valor,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string? ExtraerEntidad(string texto)
+    // ============================================================
+    // NORMALIZAR TEXTO
+    // ============================================================
+
+    private static string NormalizarTexto(
+        string texto)
     {
-        var marcadores = new[] { 
-            "municipalidad ", 
-            "entidad ",
-            "ejecutora ",
-            "pliego "
-        };
-
-        foreach (var marcador in marcadores)
-        {
-            var index = texto.IndexOf(
-                marcador,
-                StringComparison.OrdinalIgnoreCase);
-
-            if (index >= 0)
-            {
-                var entidad = texto[(index + marcador.Length)..];
-                
-                // Buscar hasta el final de la frase
-                var endIndex = entidad.IndexOfAny(new[] { '.', '?', ';', ',' });
-                if (endIndex > 0)
-                {
-                    entidad = entidad[..endIndex];
-                }
-
-                return string.IsNullOrWhiteSpace(entidad) 
-                    ? null 
-                    : entidad.Trim();
-            }
-        }
-
-        // Si no encuentra marcador, intenta extraer palabras clave
-        var palabras = texto.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var palabra in palabras)
-        {
-            if (palabra.Length > 3 && !EsPalabraComun(palabra))
-            {
-                return palabra.Trim('.', '?', ',', ';');
-            }
-        }
-
-        return null;
+        return texto
+            .Trim()
+            .ToLowerInvariant()
+            .Replace("á", "a")
+            .Replace("é", "e")
+            .Replace("í", "i")
+            .Replace("ó", "o")
+            .Replace("ú", "u");
     }
 
-    private static bool EsPalabraComun(string palabra)
+    // ============================================================
+    // EXTRAER ENTIDAD
+    // ============================================================
+
+    private static string ExtraerEntidad(
+        string pregunta)
     {
-        var comunes = new[] { 
-            "evolución", "evolucion", "presupuesto", "año", "años", "cual", "cuál",
-            "fue", "son", "los", "las", "del", "de", "el", "la", "por", "para",
-            "entre", "desde", "hasta", "municipal", "entidad", "pliego"
-        };
-        return comunes.Contains(palabra.ToLowerInvariant());
+        var texto =
+            pregunta.Trim();
+
+        string[] palabrasAEliminar =
+        [
+            "evolución",
+            "evolucion",
+            "presupuesto",
+            "gasto",
+            "gastos",
+            "ejecución",
+            "ejecucion",
+            "presupuestaria",
+            "presupuestario",
+
+            "entre",
+            "del",
+            "de",
+            "la",
+            "el",
+            "los",
+            "las",
+
+            "2017",
+            "2018",
+            "2019",
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025",
+            "2026",
+
+            "2017-2021",
+            "2022-2026",
+
+            "año",
+            "anos",
+            "años"
+        ];
+
+        foreach (var palabra in palabrasAEliminar)
+        {
+            texto =
+                texto.Replace(
+                    palabra,
+                    "",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Limpieza adicional
+        texto =
+            texto
+                .Replace("  ", " ")
+                .Replace(" - ", " ")
+                .Trim();
+
+        return texto;
     }
 }
