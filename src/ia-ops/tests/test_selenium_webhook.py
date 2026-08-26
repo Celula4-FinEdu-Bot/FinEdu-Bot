@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 
 WEBHOOK_URL = os.getenv(
     "N8N_WEBHOOK_URL",
-    "https://destructo32.app.n8n.cloud/webhook-test/4d92eb73-9517-41b3-b3b4-244fae73d81b",
+    "https://destructo32.app.n8n.cloud/webhook/question",
 )
 
 
