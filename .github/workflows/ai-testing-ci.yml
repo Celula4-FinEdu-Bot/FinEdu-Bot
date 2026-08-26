@@ -64,6 +64,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
         run: |
           TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null || true)
 
