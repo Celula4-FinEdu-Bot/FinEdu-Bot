@@ -14,6 +14,32 @@ public class EvolucionPresupuesto
 
     public decimal PorcentajeEjecucion { get; set; }
 
+    // ============================================================
+    // COMPATIBILIDAD CON NlqService / MefService
+    // ============================================================
+
+    public decimal Pia
+    {
+        get => PresupuestoInicial;
+        set => PresupuestoInicial = value;
+    }
+
+    public decimal Pim
+    {
+        get => PresupuestoModificado;
+        set => PresupuestoModificado = value;
+    }
+
+    public decimal Devengado
+    {
+        get => MontoEjecutado;
+        set => MontoEjecutado = value;
+    }
+
+    // ============================================================
+    // DISPLAY
+    // ============================================================
+
     public string AnioDisplay =>
         Anio.ToString();
 
