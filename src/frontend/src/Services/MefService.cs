@@ -157,37 +157,101 @@ public sealed class MefService
     // ============================================================
 
     private static string ConstruirConsultaSql(
-        string filtro)
+    string filtro)
+{
+    var columnas = new StringBuilder();
+
+    for (var anio = 2022; anio <= 2026; anio++)
     {
-        var columnas =
-            new StringBuilder();
-
-        for (var anio = 2022; anio <= 2026; anio++)
-        {
-            columnas.AppendLine(
-                $"COALESCE(SUM(\"PIA_{anio}\"), 0) AS \"PIA_{anio}\",");
-
-            columnas.AppendLine(
-                $"COALESCE(SUM(\"PIM_{anio}\"), 0) AS \"PIM_{anio}\",");
-
-            columnas.AppendLine(
-                $"COALESCE(SUM(\"DEVENGADO_{anio}\"), 0) AS \"DEVENGADO_{anio}\"" +
-                (anio < 2026 ? "," : ""));
-        }
-
-        var where =
-            ConstruirWhere(filtro);
-
-        var sql =
+        columnas.AppendLine(
             $"""
-            SELECT
-                {columnas}
-            FROM "{Resource2022_2026}"
-            {where}
-            """;
+            COALESCE(
+                SUM(
+                    CAST(
+                        REPLACE(
+                            COALESCE(
+                                NULLIF(
+                                    TRIM(
+                                        CAST("PIA_{anio}" AS TEXT)
+                                    ),
+                                    ''
+                                ),
+                                '0'
+                            ),
+                            ',',
+                            ''
+                        )
+                        AS NUMERIC
+                    )
+                ),
+                0
+            ) AS "PIA_{anio}",
+            """);
 
-        return sql;
+        columnas.AppendLine(
+            $"""
+            COALESCE(
+                SUM(
+                    CAST(
+                        REPLACE(
+                            COALESCE(
+                                NULLIF(
+                                    TRIM(
+                                        CAST("PIM_{anio}" AS TEXT)
+                                    ),
+                                    ''
+                                ),
+                                '0'
+                            ),
+                            ',',
+                            ''
+                        )
+                        AS NUMERIC
+                    )
+                ),
+                0
+            ) AS "PIM_{anio}",
+            """);
+
+        columnas.AppendLine(
+            $"""
+            COALESCE(
+                SUM(
+                    CAST(
+                        REPLACE(
+                            COALESCE(
+                                NULLIF(
+                                    TRIM(
+                                        CAST("DEVENGADO_{anio}" AS TEXT)
+                                    ),
+                                    ''
+                                ),
+                                '0'
+                            ),
+                            ',',
+                            ''
+                        )
+                        AS NUMERIC
+                    )
+                ),
+                0
+            ) AS "DEVENGADO_{anio}"{(anio < 2026 ? "," : "")}
+            """);
     }
+
+    var where =
+        ConstruirWhere(filtro);
+
+    var sql =
+        $"""
+        SELECT
+            {columnas}
+        FROM "{Resource2022_2026}"
+        {where}
+        """;
+
+    return sql;
+}
 
     // ============================================================
     // CONSTRUIR WHERE
