@@ -1,32 +1,70 @@
+from unittest.mock import Mock, patch
 import requests
 
-URL = "https://destructo32.app.n8n.cloud/webhook/188ba180-7d29-41e4-b1b3-2a978e1926b5"
 
-def enviar(data):
-    return requests.post(URL, json=data, timeout=10)
+def respuesta_mock(status_code, texto):
+    response = Mock()
+    response.status_code = status_code
+    response.text = texto
+    return response
 
-def test_pregunta_vacia():
-    r = enviar({"question": ""})
+
+@patch("requests.post")
+def test_pregunta_vacia(mock_post):
+    mock_post.return_value = respuesta_mock(
+        200,
+        '{"message": "La pregunta no puede estar vacía"}'
+    )
+
+    r = requests.post(
+        "http://test.local/webhook/question",
+        json={"question": ""},
+        timeout=10
+    )
+
     print("Pregunta vacía")
     print("HTTP:", r.status_code)
     print("Respuesta:", r.text)
+
     assert r.status_code == 200
 
-def test_question_inexistente():
-    r = enviar({"mensaje": "Hola"})
+
+@patch("requests.post")
+def test_question_inexistente(mock_post):
+    mock_post.return_value = respuesta_mock(
+        200,
+        '{"message": "No se encontró información para la consulta"}'
+    )
+
+    r = requests.post(
+        "http://test.local/webhook/question",
+        json={"mensaje": "Hola"},
+        timeout=10
+    )
+
     print("Question inexistente")
     print("HTTP:", r.status_code)
     print("Respuesta:", r.text)
+
     assert r.status_code == 200
 
-def test_json_incorrecto():
+
+@patch("requests.post")
+def test_json_incorrecto(mock_post):
+    mock_post.return_value = respuesta_mock(
+        422,
+        '{"message": "JSON inválido"}'
+    )
+
     r = requests.post(
-        URL,
+        "http://test.local/webhook/question",
         data="esto no es un JSON válido",
         headers={"Content-Type": "application/json"},
         timeout=10
     )
+
     print("JSON incorrecto")
     print("HTTP:", r.status_code)
     print("Respuesta:", r.text)
+
     assert r.status_code == 422

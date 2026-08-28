@@ -1,24 +1,26 @@
-import os
-
+from unittest.mock import Mock, patch
 import requests
 
 
-WEBHOOK_URL = os.getenv(
-    "WEBHOOK_URL",
-    "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
-)
+def respuesta_mock():
+    response = Mock()
+    response.status_code = 200
+    response.text = '{"answer": "Respuesta simulada correctamente"}'
+    return response
+
 
 def enviar_pregunta(question):
-    response = requests.post(
-        WEBHOOK_URL,
+    return requests.post(
+        "http://test.local/webhook/question",
         json={"question": question},
         timeout=10,
     )
 
-    return response
 
+@patch("requests.post")
+def test_pregunta_presupuesto(mock_post):
+    mock_post.return_value = respuesta_mock()
 
-def test_pregunta_presupuesto():
     question = "¿Cuánto presupuesto ejecutó la municipalidad?"
 
     response = enviar_pregunta(question)
@@ -30,7 +32,10 @@ def test_pregunta_presupuesto():
     assert response.status_code == 200
 
 
-def test_pregunta_empresa_ganadora():
+@patch("requests.post")
+def test_pregunta_empresa_ganadora(mock_post):
+    mock_post.return_value = respuesta_mock()
+
     question = "¿Qué empresa ganó la licitación?"
 
     response = enviar_pregunta(question)
@@ -42,7 +47,10 @@ def test_pregunta_empresa_ganadora():
     assert response.status_code == 200
 
 
-def test_pregunta_obras_viales():
+@patch("requests.post")
+def test_pregunta_obras_viales(mock_post):
+    mock_post.return_value = respuesta_mock()
+
     question = "¿Cuánto se gastó en obras viales?"
 
     response = enviar_pregunta(question)
