@@ -2,12 +2,12 @@ name: Frontend CI Pipeline
 
 on:
   pull_request:
+    branches: [main, develop]
     paths:
       - "src/frontend/**"
       - ".github/workflows/frontend-ci.yml"
   push:
-    branches:
-      - main
+    branches: [main, develop]
     paths:
       - "src/frontend/**"
       - ".github/workflows/frontend-ci.yml"
@@ -23,27 +23,89 @@ jobs:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: "20"
+          dotnet-version: "9.0.x"
 
-      - name: Verificar estructura de archivos del Frontend
+      - name: Verificar estructura minima del proyecto Blazor
         run: |
-          echo "=== Verificando componentes del Microfrontend NLQ ==="
+          echo "Verificando estructura del frontend..."
           if [ ! -d "src/frontend" ]; then
-            echo "ℹ️ No se encontró la carpeta src/frontend. Se omite validación de frontend."
+            echo "Aun no existe src/frontend. Se omite validacion."
             exit 0
           fi
-          echo "✅ Estructura de directorio validada."
-
-      - name: Instalar dependencias y validar sintaxis (si aplica package.json)
-        run: |
-          if [ -f "src/frontend/package.json" ]; then
-            cd src/frontend
-            npm ci
-            npm run lint --if-present
-            npm run build --if-present
-          else
-            echo "ℹ️ Proyecto sin package.json detectado. Pasando validación de estructura estática."
+          PROJECT=$(find src/frontend -maxdepth 1 -name "*.csproj" | head -n 1)
+          if [ -z "$PROJECT" ]; then
+            echo "No se encontro .csproj en src/frontend. Se omite validacion."
+            exit 0
           fi
+          for required in "Program.cs" "Components" "Data/AppDbContext.cs"; do
+            if [ ! -e "src/frontend/$required" ]; then
+              echo "Falta $required. La estructura del proyecto no es valida."
+              exit 1
+            fi
+          done
+          echo "OK: estructura del proyecto valida."
+
+      - name: Restaurar y compilar
+        run: |
+          PROJECT=$(find src/frontend -maxdepth 1 -name "*.csproj" | head -n 1)
+          if [ -z "$PROJECT" ]; then
+            echo "No hay .csproj. Se omite build."
+            exit 0
+          fi
+          dotnet restore "$PROJECT"
+          dotnet build "$PROJECT" --no-restore --configuration Release /warnaserror
+
+      - name: Verificar que no se suban archivos de configuracion sensibles
+        run: |
+          BLOCKED=$(find src/frontend -maxdepth 1 -type f \( \
+            -iname "appsettings.Production.json" -o \
+            -iname "*.pfx" -o -iname "*.pem" -o -iname "*.key" -o \
+            -iname ".env" \) )
+          if [ -n "$BLOCKED" ]; then
+            echo "Se encontraron archivos sensibles que no deben estar en el repo:"
+            echo "$BLOCKED"
+            exit 1
+          fi
+          echo "OK: no hay archivos de configuracion sensibles."
+
+      - name: Buscar credenciales quemadas en el codigo
+        run: |
+          echo "Buscando patrones de credenciales expuestas..."
+          FILES=$(find src/frontend -type f \( -name "*.cs" -o -name "*.razor" -o -name "appsettings.json" -o -name "appsettings.Development.json" \) 2>/dev/null || true)
+          if [ -z "$FILES" ]; then
+            echo "No hay archivos fuente para escanear."
+            exit 0
+          fi
+          PATTERN='(api[_-]?key|apikey|secret|password|passwd|token|bearer|connectionstring)["\x27]?\s*[:=]\s*["\x27][A-Za-z0-9_\-]{8,}'
+          found=0
+          for file in $FILES; do
+            if grep -Eio "$PATTERN" "$file" > /dev/null; then
+              echo "Posible credencial quemada en: $file"
+              grep -Eino "$PATTERN" "$file"
+              found=1
+            fi
+          done
+          if [ $found -eq 1 ]; then
+            echo "Se encontraron posibles credenciales expuestas. Usa User Secrets o variables de entorno."
+            exit 1
+          fi
+          echo "OK: no se encontraron credenciales quemadas."
+
+      - name: Auditoria de dependencias NuGet vulnerables
+        run: |
+          PROJECT=$(find src/frontend -maxdepth 1 -name "*.csproj" | head -n 1)
+          if [ -z "$PROJECT" ]; then
+            echo "No hay .csproj. Se omite auditoria."
+            exit 0
+          fi
+          echo "Revisando paquetes NuGet con vulnerabilidades conocidas..."
+          RESULT=$(dotnet list "$PROJECT" package --vulnerable --include-transitive 2>&1)
+          echo "$RESULT"
+          if echo "$RESULT" | grep -qi "has the following vulnerable packages"; then
+            echo "Se encontraron paquetes NuGet vulnerables. Revisar y actualizar."
+            exit 1
+          fi
+          echo "OK: no se encontraron vulnerabilidades conocidas."
