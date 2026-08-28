@@ -120,4 +120,99 @@ public sealed class MefRecord
     public decimal Comprometido2016 { get; set; }
     public decimal Devengado2016 { get; set; }
     public decimal Girado2016 { get; set; }
+
+    //para 2017    
+    public decimal Pia2017 { get; set; }
+    public decimal Pim2017 { get; set; }
+    public decimal Certificado2017 { get; set; }
+    public decimal ComprometidoAnual2017 { get; set; }
+    public decimal Comprometido2017 { get; set; }
+    public decimal Devengado2017 { get; set; }
+    public decimal Girado2017 { get; set; }
+
+    //para 2018    
+    public decimal Pia2018 { get; set; }
+    public decimal Pim2018 { get; set; }
+    public decimal Certificado2018 { get; set; }
+    public decimal ComprometidoAnual2018 { get; set; }
+    public decimal Comprometido2018 { get; set; }
+    public decimal Devengado2018 { get; set; }
+    public decimal Girado2018 { get; set; }
+
+    //para 2019    
+    public decimal Pia2019 { get; set; }
+    public decimal Pim2019 { get; set; }
+    public decimal Certificado2019 { get; set; }
+    public decimal ComprometidoAnual2019 { get; set; }
+    public decimal Comprometido2019 { get; set; }
+    public decimal Devengado2019 { get; set; }
+    public decimal Girado2019 { get; set; }
+
+    //para 2020    
+    public decimal Pia2020 { get; set; }
+    public decimal Pim2020 { get; set; }
+    public decimal Certificado2020 { get; set; }
+    public decimal ComprometidoAnual2020 { get; set; }
+    public decimal Comprometido2020 { get; set; }
+    public decimal Devengado2020 { get; set; }
+    public decimal Girado2020 { get; set; }
+
+    //para 2021    
+    public decimal Pia2021 { get; set; }
+    public decimal Pim2021 { get; set; }
+    public decimal Certificado2021 { get; set; }
+    public decimal ComprometidoAnual2021 { get; set; }
+    public decimal Comprometido2021 { get; set; }
+    public decimal Devengado2021 { get; set; }
+    public decimal Girado2021 { get; set; }
+
+
+    //para 2022    
+    public decimal Pia2022 { get; set; }
+    public decimal Pim2022 { get; set; }
+    public decimal Certificado2022 { get; set; }
+    public decimal ComprometidoAnual2022 { get; set; }
+    public decimal Comprometido2022 { get; set; }
+    public decimal Devengado2022 { get; set; }
+    public decimal Girado2022 { get; set; }
+
+
+    //para 2023   
+    public decimal Pia2023 { get; set; }
+    public decimal Pim2023 { get; set; }
+    public decimal Certificado2023 { get; set; }
+    public decimal ComprometidoAnual2023 { get; set; }
+    public decimal Comprometido2023 { get; set; }
+    public decimal Devengado2023 { get; set; }
+    public decimal Girado2023 { get; set; }
+
+    //para 2024   
+    public decimal Pia2024 { get; set; }
+    public decimal Pim2024 { get; set; }
+    public decimal Certificado2024 { get; set; }
+    public decimal ComprometidoAnual2024 { get; set; }
+    public decimal Comprometido2024 { get; set; }
+    public decimal Devengado2024 { get; set; }
+    public decimal Girado2024 { get; set; }
+
+
+    //para 2025 
+    public decimal Pia2025 { get; set; }
+    public decimal Pim2025 { get; set; }
+    public decimal Certificado2025 { get; set; }
+    public decimal ComprometidoAnual2025 { get; set; }
+    public decimal Comprometido2025 { get; set; }
+    public decimal Devengado2025 { get; set; }
+    public decimal Girado2025 { get; set; }
+
+
+    //para 2026   
+    public decimal Pia2026 { get; set; }
+    public decimal Pim2026 { get; set; }
+    public decimal Certificado2026 { get; set; }
+    public decimal ComprometidoAnual2026 { get; set; }
+    public decimal Comprometido2026 { get; set; }
+    public decimal Devengado2026 { get; set; }
+    public decimal Girado2026 { get; set; }
+
 }
