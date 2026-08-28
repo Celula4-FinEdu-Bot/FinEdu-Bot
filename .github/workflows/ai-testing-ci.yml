@@ -1,16 +1,11 @@
+
 name: AI Ops & Prompt Security Testing
 
 on:
   pull_request:
     branches: [main, develop]
-    paths:
-      - "src/ia-ops/**"
-      - ".github/workflows/ai-testing-ci.yml"
   push:
     branches: [main, develop]
-    paths:
-      - "src/ia-ops/**"
-      - ".github/workflows/ai-testing-ci.yml"
 
 permissions:
   contents: read
@@ -70,8 +65,10 @@ jobs:
           N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
         run: |
           TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null || true)
+
           if [ -n "$TEST_FILES" ]; then
             pytest src/ia-ops/tests/ -v --tb=short
           else
             echo "Aún no hay archivos de prueba en src/ia-ops/tests. Se omite la ejecución."
           fi
+
