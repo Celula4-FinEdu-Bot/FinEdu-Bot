@@ -1,52 +1,32 @@
 import requests
 
-WEBHOOK_URL = "https://diogocanchari.app.n8n.cloud/webhook/ai-agent-orchestrator"
+URL = "https://destructo32.app.n8n.cloud/webhook/188ba180-7d29-41e4-b1b3-2a978e1926b5"
 
-
-def enviar_pregunta(data):
-    return requests.post(
-        WEBHOOK_URL,
-        json=data,
-        timeout=10
-    )
-
+def enviar(data):
+    return requests.post(URL, json=data, timeout=10)
 
 def test_pregunta_vacia():
-    response = enviar_pregunta({
-        "question": ""
-    })
-
+    r = enviar({"question": ""})
     print("Pregunta vacía")
-    print(f"HTTP: {response.status_code}")
-    print(f"Respuesta: {response.text}")
+    print("HTTP:", r.status_code)
+    print("Respuesta:", r.text)
+    assert r.status_code == 200
 
-    assert response.status_code == 200
-
-
-def test_campo_question_inexistente():
-    response = enviar_pregunta({
-        "mensaje": "Hola"
-    })
-
-    print("Campo question inexistente")
-    print(f"HTTP: {response.status_code}")
-    print(f"Respuesta: {response.text}")
-
-    assert response.status_code == 200
-
+def test_question_inexistente():
+    r = enviar({"mensaje": "Hola"})
+    print("Question inexistente")
+    print("HTTP:", r.status_code)
+    print("Respuesta:", r.text)
+    assert r.status_code == 200
 
 def test_json_incorrecto():
-    response = requests.post(
-        WEBHOOK_URL,
+    r = requests.post(
+        URL,
         data="esto no es un JSON válido",
-        headers={
-            "Content-Type": "application/json"
-        },
+        headers={"Content-Type": "application/json"},
         timeout=10
     )
-
     print("JSON incorrecto")
-    print(f"HTTP: {response.status_code}")
-    print(f"Respuesta: {response.text}")
-
-    assert response.status_code == 422
+    print("HTTP:", r.status_code)
+    print("Respuesta:", r.text)
+    assert r.status_code == 422
