@@ -64,8 +64,8 @@
                     @foreach (var item in resultado.Evolucion)
                     {
                         <tr>
-                            <td><strong>@item.Anio</strong></td>
-                            <td>@item.Entidad</td>
+                            <td><strong>@item.ActividadAccionObra</strong></td>
+                            <td>@item.Ejecutora</td>
                             <td>@item.PresupuestoInicialDisplay</td>
                             <td>@item.PresupuestoModificadoDisplay</td>
                             <td>@item.MontoEjecutadoDisplay</td>
@@ -92,7 +92,7 @@
                         <div class="col-md-3 mb-3">
                             <div class="card">
                                 <div class="card-body text-center">
-                                    <h6 class="card-title">@item.Anio</h6>
+                                    <h6 class="card-title">@item.ActividadAccionObra</h6>
                                     <div class="progress" style="height: 20px;">
                                         <div class="progress-bar @(item.PorcentajeEjecucion >= 80 ? "bg-success" : item.PorcentajeEjecucion >= 50 ? "bg-warning" : "bg-danger")"
                                              role="progressbar"

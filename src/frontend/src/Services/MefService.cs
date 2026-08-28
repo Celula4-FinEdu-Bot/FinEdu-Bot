@@ -12,12 +12,18 @@ public sealed class MefService
     private const string BaseUrl =
         "https://api.datosabiertos.mef.gob.pe/DatosAbiertos/v1/";
 
-    // ============================================================
-    // DATASET COMPARATIVO DE GASTOS 2022-2026
-    // ============================================================
+    /*
+     * IMPORTANTE:
+     *
+     * Coloca aquí el Resource ID REAL del recurso
+     * comparativo de gastos 2017-2021 que estés utilizando.
+     *
+     * No reutilices el Resource ID 2022-2026.
+     */
+    private const string ResourceId2017_2021 =
+        "0e2469d8-5872-4bc2-a5bc-91ee01c99df8";
 
-    private const string Resource2022_2026 =
-        "510bae6d-3d37-4fb2-af35-a40ce01715f4";
+    private const int Limit = 100;
 
     public MefService(HttpClient httpClient)
     {
@@ -28,7 +34,7 @@ public sealed class MefService
     }
 
     // ============================================================
-    // OBTENER EVOLUCIÓN
+    // OBTENER EVOLUCIÓN 2017-2021
     // ============================================================
 
     public async Task<List<EvolucionPresupuesto>>
@@ -40,32 +46,45 @@ public sealed class MefService
             LimpiarFiltro(filtro);
 
         Console.WriteLine();
-        Console.WriteLine("======================================");
-        Console.WriteLine("MEF - EVOLUCIÓN PRESUPUESTARIA");
+        Console.WriteLine("==========================================");
+        Console.WriteLine("MEF - CONSULTA 2017-2021");
         Console.WriteLine(
-            $"Filtro recibido: '{filtro}'");
+            $"Filtro: '{filtro}'");
         Console.WriteLine(
-            $"Dataset: {Resource2022_2026}");
-        Console.WriteLine("======================================");
+            $"Resource ID: {ResourceId2017_2021}");
+        Console.WriteLine("==========================================");
+
+        if (
+            ResourceId2017_2021 ==
+            "COLOCA_AQUI_EL_RESOURCE_ID_2017_2021")
+        {
+            throw new InvalidOperationException(
+                "Debes colocar el Resource ID del dataset 2017-2021 en MefService.cs.");
+        }
 
         try
         {
-            var sql =
-                ConstruirConsultaSql(filtro);
-
-            Console.WriteLine();
-            Console.WriteLine("--------------------------------------");
-            Console.WriteLine("MEF - CONSULTA SQL");
-            Console.WriteLine("--------------------------------------");
-            Console.WriteLine(sql);
-
             var url =
-                $"{BaseUrl}datastore_search_sql" +
-                $"?sql={Uri.EscapeDataString(sql)}";
+                $"{BaseUrl}datastore_search" +
+                $"?resource_id={Uri.EscapeDataString(ResourceId2017_2021)}" +
+                $"&limit={Limit}";
+
+            /*
+             * El filtro se realiza mediante q solamente cuando
+             * existe una entidad explícita.
+             */
+            if (!string.IsNullOrWhiteSpace(filtro))
+            {
+                url +=
+                    $"&q={Uri.EscapeDataString(filtro)}";
+            }
 
             Console.WriteLine();
-            Console.WriteLine(
-                $"URL MEF SQL: {url}");
+            Console.WriteLine("------------------------------------------");
+            Console.WriteLine("MEF - DATASTORE SEARCH");
+            Console.WriteLine("------------------------------------------");
+
+            Console.WriteLine(url);
 
             using var response =
                 await _httpClient.GetAsync(
@@ -78,377 +97,576 @@ public sealed class MefService
 
             Console.WriteLine();
             Console.WriteLine(
-                $"HTTP MEF SQL: {(int)response.StatusCode}");
+                $"HTTP MEF: {(int)response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine(
-                    "MEF respondió con error:");
+                    "Respuesta de error del MEF:");
 
                 Console.WriteLine(json);
 
                 return [];
             }
 
-            Console.WriteLine(
-                $"Respuesta MEF recibida: {json.Length} caracteres.");
-
             var registros =
                 ExtraerRegistros(json);
 
             Console.WriteLine(
-                $"Registros SQL recibidos: {registros.Count}");
+                $"Registros recibidos: {registros.Count}");
 
             if (registros.Count == 0)
             {
-                Console.WriteLine(
-                    "La consulta SQL no devolvió registros.");
-
                 return [];
             }
 
-            var evolucion =
-                ConstruirEvolucion(
-                    registros,
-                    filtro);
+            /*
+             * Cada objeto recibido representa una fila
+             * del dataset 2017-2021.
+             *
+             * No existe una columna ANIO.
+             * Los cinco años están dentro del mismo registro.
+             */
+            var resultados =
+                registros
+                    .Select(MapearRegistro)
+                    .Where(x =>
+                        x is not null)
+                    .Select(x => x!)
+                    .ToList();
 
-            Console.WriteLine();
-            Console.WriteLine("--------------------------------------");
-            Console.WriteLine("EVOLUCIÓN CALCULADA");
-            Console.WriteLine("--------------------------------------");
+            Console.WriteLine(
+                $"Registros convertidos: {resultados.Count}");
 
-            foreach (var item in evolucion)
-            {
-                Console.WriteLine(
-                    $"{item.Anio} | " +
-                    $"PIA={item.Pia:N2} | " +
-                    $"PIM={item.Pim:N2} | " +
-                    $"DEVENGADO={item.Devengado:N2} | " +
-                    $"EJECUCIÓN={item.PorcentajeEjecucion:N2}%");
-            }
-
-            return evolucion;
+            return resultados;
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
             Console.WriteLine(
-                $"Consulta MEF cancelada: {ex.Message}");
+                "La consulta al MEF fue cancelada.");
 
             return [];
         }
         catch (HttpRequestException ex)
         {
             Console.WriteLine(
-                $"Error HTTP MEF: {ex.Message}");
+                $"Error HTTP del MEF: {ex.Message}");
 
             return [];
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"Error consultando MEF: {ex}");
+                $"Error procesando MEF: {ex}");
 
             return [];
         }
     }
 
     // ============================================================
-    // CONSTRUIR CONSULTA SQL
+    // MAPEAR REGISTRO
     // ============================================================
 
-    private static string ConstruirConsultaSql(
-    string filtro)
-{
-    var columnas = new StringBuilder();
-
-    for (var anio = 2022; anio <= 2026; anio++)
+    private static EvolucionPresupuesto?
+        MapearRegistro(
+            Dictionary<string, JsonElement> registro)
     {
-        columnas.AppendLine(
-            $"""
-            COALESCE(
-                SUM(
-                    CAST(
-                        REPLACE(
-                            COALESCE(
-                                NULLIF(
-                                    TRIM(
-                                        CAST("PIA_{anio}" AS TEXT)
-                                    ),
-                                    ''
-                                ),
-                                '0'
-                            ),
-                            ',',
-                            ''
-                        )
-                        AS NUMERIC
-                    )
-                ),
-                0
-            ) AS "PIA_{anio}",
-            """);
+        if (registro.Count == 0)
+        {
+            return null;
+        }
 
-        columnas.AppendLine(
-            $"""
-            COALESCE(
-                SUM(
-                    CAST(
-                        REPLACE(
-                            COALESCE(
-                                NULLIF(
-                                    TRIM(
-                                        CAST("PIM_{anio}" AS TEXT)
-                                    ),
-                                    ''
-                                ),
-                                '0'
-                            ),
-                            ',',
-                            ''
-                        )
-                        AS NUMERIC
-                    )
-                ),
-                0
-            ) AS "PIM_{anio}",
-            """);
+        return new EvolucionPresupuesto
+        {
+            // ====================================================
+            // IDENTIFICACIÓN
+            // ====================================================
 
-        columnas.AppendLine(
-            $"""
-            COALESCE(
-                SUM(
-                    CAST(
-                        REPLACE(
-                            COALESCE(
-                                NULLIF(
-                                    TRIM(
-                                        CAST("DEVENGADO_{anio}" AS TEXT)
-                                    ),
-                                    ''
-                                ),
-                                '0'
-                            ),
-                            ',',
-                            ''
-                        )
-                        AS NUMERIC
-                    )
-                ),
-                0
-            ) AS "DEVENGADO_{anio}"{(anio < 2026 ? "," : "")}
-            """);
+            KeyValue =
+                ObtenerTexto(
+                    registro,
+                    "KEY_VALUE"),
+
+            NivelGobierno =
+                ObtenerTexto(
+                    registro,
+                    "NIVEL_GOBIERNO"),
+
+            NivelGobiernoNombre =
+                ObtenerTexto(
+                    registro,
+                    "NIVEL_GOBIERNO_NOMBRE"),
+
+            Sector =
+                ObtenerTexto(
+                    registro,
+                    "SECTOR"),
+
+            SectorNombre =
+                ObtenerTexto(
+                    registro,
+                    "SECTOR_NOMBRE"),
+
+            Pliego =
+                ObtenerTexto(
+                    registro,
+                    "PLIEGO"),
+
+            PliegoNombre =
+                ObtenerTexto(
+                    registro,
+                    "PLIEGO_NOMBRE"),
+
+            SecEjecut =
+                ObtenerTexto(
+                    registro,
+                    "SEC_EJEC"),
+
+            Ejecutora =
+                ObtenerTexto(
+                    registro,
+                    "EJECUTORA"),
+
+            EjecutoraNombre =
+                ObtenerTexto(
+                    registro,
+                    "EJECUTORA_NOMBRE"),
+
+            // ====================================================
+            // UBICACIÓN
+            // ====================================================
+
+            DepartamentoEjecutora =
+                ObtenerTexto(
+                    registro,
+                    "DEPARTAMENTO_EJECUTORA"),
+
+            DepartamentoEjecutoraNombre =
+                ObtenerTexto(
+                    registro,
+                    "DEPARTAMENTO_EJECUTORA_NOMBRE"),
+
+            ProvinciaEjecutora =
+                ObtenerTexto(
+                    registro,
+                    "PROVINCIA_EJECUTORA"),
+
+            ProvinciaEjecutoraNombre =
+                ObtenerTexto(
+                    registro,
+                    "PROVINCIA_EJECUTORA_NOMBRE"),
+
+            DistritoEjecutora =
+                ObtenerTexto(
+                    registro,
+                    "DISTRITO_EJECUTORA"),
+
+            DistritoEjecutoraNombre =
+                ObtenerTexto(
+                    registro,
+                    "DISTRITO_EJECUTORA_NOMBRE"),
+
+            // ====================================================
+            // PROGRAMA
+            // ====================================================
+
+            ProgramaPpto =
+                ObtenerTexto(
+                    registro,
+                    "PROGRAMA_PPT0",
+                    "PROGRAMA_PPTO"),
+
+            ProgramaPptoNombre =
+                ObtenerTexto(
+                    registro,
+                    "PROGRAMA_PPTO_NOMBRE"),
+
+            TipoActProy =
+                ObtenerTexto(
+                    registro,
+                    "TIPO_ACT_PROY"),
+
+            TipoActProyNombre =
+                ObtenerTexto(
+                    registro,
+                    "TIPO_ACT_PROY_NOMBRE"),
+
+            ProductoProyecto =
+                ObtenerTexto(
+                    registro,
+                    "PRODUCTO_PROYECTO"),
+
+            ProductoProyectoNombre =
+                ObtenerTexto(
+                    registro,
+                    "PRODUCTO_PROYECTO_NOMBRE"),
+
+            ActividadAccionObra =
+                ObtenerTexto(
+                    registro,
+                    "ACTIVIDAD_ACCION_OBRA"),
+
+            ActividadAccionObraNombre =
+                ObtenerTexto(
+                    registro,
+                    "ACTIVIDAD_ACCION_OBRA_NOMBRE"),
+
+            // ====================================================
+            // CLASIFICACIÓN FUNCIONAL
+            // ====================================================
+
+            Funcion =
+                ObtenerTexto(
+                    registro,
+                    "FUNCION"),
+
+            FuncionNombre =
+                ObtenerTexto(
+                    registro,
+                    "FUNCION_NOMBRE"),
+
+            DivisionFuncional =
+                ObtenerTexto(
+                    registro,
+                    "DIVISION_FUNCIONAL"),
+
+            DivisionFuncionalNombre =
+                ObtenerTexto(
+                    registro,
+                    "DIVISION_FUNCIONAL_NOMBRE"),
+
+            GrupoFuncional =
+                ObtenerTexto(
+                    registro,
+                    "GRUPO_FUNCIONAL"),
+
+            GrupoFuncionalNombre =
+                ObtenerTexto(
+                    registro,
+                    "GRUPO_FUNCIONAL_NOMBRE"),
+
+            Meta =
+                ObtenerTexto(
+                    registro,
+                    "META"),
+
+            MetaNombre =
+                ObtenerTexto(
+                    registro,
+                    "META_NOMBRE"),
+
+            DepartamentoMeta =
+                ObtenerTexto(
+                    registro,
+                    "DEPARTAMENTO_META"),
+
+            DepartamentoMetaNombre =
+                ObtenerTexto(
+                    registro,
+                    "DEPARTAMENTO_META_NOMBRE"),
+
+            // ====================================================
+            // FINANCIAMIENTO
+            // ====================================================
+
+            FuenteFinanciamiento =
+                ObtenerTexto(
+                    registro,
+                    "FUENTE_FINANCIAMIENTO"),
+
+            FuenteFinanciamientoNombre =
+                ObtenerTexto(
+                    registro,
+                    "FUENTE_FINANCIAMIENTO_NOMBRE"),
+
+            Rubro =
+                ObtenerTexto(
+                    registro,
+                    "RUBRO"),
+
+            RubroNombre =
+                ObtenerTexto(
+                    registro,
+                    "RUBRO_NOMBRE"),
+
+            TipoRecurso =
+                ObtenerTexto(
+                    registro,
+                    "TIPO_RECURSO"),
+
+            TipoRecursoNombre =
+                ObtenerTexto(
+                    registro,
+                    "TIPO_RECURSO_NOMBRE"),
+
+            // ====================================================
+            // GASTO
+            // ====================================================
+
+            CategoriaGasto =
+                ObtenerNullableInt(
+                    registro,
+                    "CATEGORIA_GASTO"),
+
+            CategoriaGastoNombre =
+                ObtenerTexto(
+                    registro,
+                    "CATEGORIA_GASTO_NOMBRE"),
+
+            TipoTransaccion =
+                ObtenerNullableInt(
+                    registro,
+                    "TIPO_TRANSACCION"),
+
+            Generica =
+                ObtenerNullableInt(
+                    registro,
+                    "GENERICA"),
+
+            GenericaNombre =
+                ObtenerTexto(
+                    registro,
+                    "GENERICA_NOMBRE"),
+
+            Subgenerica =
+                ObtenerNullableInt(
+                    registro,
+                    "SUBGENERICA"),
+
+            SubgenericaNombre =
+                ObtenerTexto(
+                    registro,
+                    "SUBGENERICA_NOMBRE"),
+
+            SubgenericaDet =
+                ObtenerNullableInt(
+                    registro,
+                    "SUBGENERICA_DET"),
+
+            SubgenericaDetNombre =
+                ObtenerTexto(
+                    registro,
+                    "SUBGENERICA_DET_NOMBRE"),
+
+            Especifica =
+                ObtenerNullableInt(
+                    registro,
+                    "ESPECIFICA"),
+
+            EspecificaNombre =
+                ObtenerTexto(
+                    registro,
+                    "ESPECIFICA_NOMBRE"),
+
+            EspecificaDet =
+                ObtenerNullableInt(
+                    registro,
+                    "ESPECIFICA_DET"),
+
+            EspecificaDetNombre =
+                ObtenerTexto(
+                    registro,
+                    "ESPECIFICA_DET_NOMBRE"),
+
+            // ====================================================
+            // 2017
+            // ====================================================
+
+            Pia2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIA_2017"),
+
+            Pim2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIM_2017"),
+
+            Certificado2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_CERTIFICADO_2017"),
+
+            ComprometidoAnual2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_ANUAL_2017"),
+
+            Comprometido2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_2017"),
+
+            Devengado2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_DEVENGADO_2017"),
+
+            Girado2017 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_GIRADO_2017"),
+
+            // ====================================================
+            // 2018
+            // ====================================================
+
+            Pia2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIA_2018"),
+
+            Pim2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIM_2018"),
+
+            Certificado2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_CERTIFICADO_2018"),
+
+            ComprometidoAnual2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_ANUAL_2018"),
+
+            Comprometido2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_2018"),
+
+            Devengado2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_DEVENGADO_2018"),
+
+            Girado2018 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_GIRADO_2018"),
+
+            // ====================================================
+            // 2019
+            // ====================================================
+
+            Pia2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIA_2019"),
+
+            Pim2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIM_2019"),
+
+            Certificado2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_CERTIFICADO_2019"),
+
+            ComprometidoAnual2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_ANUAL_2019"),
+
+            Comprometido2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_2019"),
+
+            Devengado2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_DEVENGADO_2019"),
+
+            Girado2019 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_GIRADO_2019"),
+
+            // ====================================================
+            // 2020
+            // ====================================================
+
+            Pia2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIA_2020"),
+
+            Pim2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIM_2020"),
+
+            Certificado2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_CERTIFICADO_2020"),
+
+            ComprometidoAnual2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_ANUAL_2020"),
+
+            Comprometido2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_2020"),
+
+            Devengado2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_DEVENGADO_2020"),
+
+            Girado2020 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_GIRADO_2020"),
+
+            // ====================================================
+            // 2021
+            // ====================================================
+
+            Pia2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIA_2021"),
+
+            Pim2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_PIM_2021"),
+
+            Certificado2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_CERTIFICADO_2021"),
+
+            ComprometidoAnual2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_ANUAL_2021"),
+
+            Comprometido2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_COMPROMETIDO_2021"),
+
+            Devengado2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_DEVENGADO_2021"),
+
+            Girado2021 =
+                ObtenerDecimal(
+                    registro,
+                    "MONTO_GIRADO_2021")
+        };
     }
 
-    var where =
-        ConstruirWhere(filtro);
-
-    var sql =
-        $"""
-        SELECT
-            {columnas}
-        FROM "{Resource2022_2026}"
-        {where}
-        """;
-
-    return sql;
-}
-
     // ============================================================
-    // CONSTRUIR WHERE
-    // ============================================================
-
-    private static string ConstruirWhere(
-        string filtro)
-    {
-        if (string.IsNullOrWhiteSpace(filtro))
-        {
-            Console.WriteLine(
-                "MEF: consulta global sin filtro de entidad.");
-
-            return "";
-        }
-
-        var normalizado =
-            Normalizar(filtro);
-
-        // ========================================================
-        // GOBIERNOS REGIONALES
-        // ========================================================
-
-        if (
-            normalizado.Contains(
-                "GOBIERNO REGIONAL",
-                StringComparison.OrdinalIgnoreCase) ||
-            normalizado == "REGIONAL" ||
-            normalizado.Contains(
-                "GOBIERNOS REGIONALES",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine(
-                "MEF: filtro detectado = GOBIERNO REGIONAL");
-
-            return
-                """
-                WHERE
-                    "NIVEL_GOBIERNO" = 'R'
-                    OR
-                    "NIVEL_GOBIERNO_NOMBRE"
-                        ILIKE '%REGIONAL%'
-                """;
-        }
-
-        // ========================================================
-        // MUNICIPALIDAD DE LIMA
-        // ========================================================
-
-        if (
-            normalizado.Contains(
-                "MUNICIPALIDAD DE LIMA",
-                StringComparison.OrdinalIgnoreCase) ||
-            normalizado.Contains(
-                "MUNICIPALIDAD METROPOLITANA DE LIMA",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine(
-                "MEF: filtro detectado = MUNICIPALIDAD DE LIMA");
-
-            // Municipalidad Metropolitana de Lima
-            // tiene presencia presupuestaria asociada a los
-            // pliegos 150 y 465.
-            return
-                """
-                WHERE
-                    "PLIEGO" IN ('150', '465')
-                    OR
-                    "PLIEGO_NOMBRE"
-                        ILIKE '%MUNICIPALIDAD METROPOLITANA DE LIMA%'
-                    OR
-                    "EJECUTORA_NOMBRE"
-                        ILIKE '%MUNICIPALIDAD METROPOLITANA DE LIMA%'
-                """;
-        }
-
-        // ========================================================
-        // MINISTERIOS
-        // ========================================================
-
-        var pliego =
-            ResolverPliego(normalizado);
-
-        if (!string.IsNullOrWhiteSpace(pliego))
-        {
-            Console.WriteLine(
-                $"MEF: pliego detectado = {pliego}");
-
-            return
-                $"WHERE \"PLIEGO\" = '{pliego}'";
-        }
-
-        // ========================================================
-        // BÚSQUEDA GENERAL
-        // ========================================================
-
-        var termino =
-            EscaparSql(filtro);
-
-        Console.WriteLine(
-            $"MEF: búsqueda textual = '{filtro}'");
-
-        return
-            $"""
-            WHERE
-                "PLIEGO_NOMBRE" ILIKE '%{termino}%'
-                OR
-                "EJECUTORA_NOMBRE" ILIKE '%{termino}%'
-                OR
-                "SECTOR_NOMBRE" ILIKE '%{termino}%'
-            """;
-    }
-
-    // ============================================================
-    // RESOLVER PLIEGO
-    // ============================================================
-
-    private static string ResolverPliego(
-        string filtro)
-    {
-        if (
-            filtro.Contains(
-                "MINISTERIO DE DEFENSA",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro == "DEFENSA")
-        {
-            return "026";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DE SALUD",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro == "SALUD")
-        {
-            return "011";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DE EDUCACION",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro == "EDUCACION")
-        {
-            return "010";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DE ECONOMIA",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro.Contains(
-                "ECONOMIA Y FINANZAS",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "009";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DEL INTERIOR",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro.Contains(
-                "MINISTERIO DE INTERIOR",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro == "INTERIOR")
-        {
-            return "007";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DE TRANSPORTES",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro.Contains(
-                "TRANSPORTES Y COMUNICACIONES",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "036";
-        }
-
-        if (
-            filtro.Contains(
-                "MINISTERIO DE DESARROLLO E INCLUSION SOCIAL",
-                StringComparison.OrdinalIgnoreCase) ||
-            filtro.Contains(
-                "DESARROLLO E INCLUSION SOCIAL",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "040";
-        }
-
-        return "";
-    }
-
-    // ============================================================
-    // EXTRAER REGISTROS
+    // EXTRAER RECORDS
     // ============================================================
 
     private static List<Dictionary<string, JsonElement>>
@@ -458,327 +676,213 @@ public sealed class MefService
         var resultado =
             new List<Dictionary<string, JsonElement>>();
 
-        try
+        using var document =
+            JsonDocument.Parse(json);
+
+        var root =
+            document.RootElement;
+
+        JsonElement records;
+
+        if (
+            root.TryGetProperty(
+                "result",
+                out var result) &&
+            result.ValueKind ==
+                JsonValueKind.Object &&
+            result.TryGetProperty(
+                "records",
+                out var recordsResult))
         {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return resultado;
-            }
+            records =
+                recordsResult;
+        }
+        else if (
+            root.TryGetProperty(
+                "records",
+                out var recordsDirectos))
+        {
+            records =
+                recordsDirectos;
+        }
+        else
+        {
+            return resultado;
+        }
 
-            using var document =
-                JsonDocument.Parse(json);
+        if (
+            records.ValueKind !=
+            JsonValueKind.Array)
+        {
+            return resultado;
+        }
 
-            var root =
-                document.RootElement;
-
-            JsonElement records;
-
-            // ====================================================
-            // FORMATO 1
-            // records directamente en raíz
-            // ====================================================
-
+        foreach (
+            var record
+            in records.EnumerateArray())
+        {
             if (
-                root.TryGetProperty(
-                    "records",
-                    out var recordsDirectos))
+                record.ValueKind !=
+                JsonValueKind.Object)
             {
-                records =
-                    recordsDirectos;
+                continue;
             }
 
-            // ====================================================
-            // FORMATO 2
-            // result.records
-            // ====================================================
-
-            else if (
-                root.TryGetProperty(
-                    "result",
-                    out var result) &&
-                result.ValueKind ==
-                    JsonValueKind.Object &&
-                result.TryGetProperty(
-                    "records",
-                    out var recordsResult))
-            {
-                records =
-                    recordsResult;
-            }
-            else
-            {
-                Console.WriteLine(
-                    "La respuesta MEF no contiene records.");
-
-                Console.WriteLine(
-                    $"JSON recibido: {json}");
-
-                return resultado;
-            }
-
-            if (
-                records.ValueKind !=
-                JsonValueKind.Array)
-            {
-                Console.WriteLine(
-                    "records no es un arreglo.");
-
-                return resultado;
-            }
+            var diccionario =
+                new Dictionary<string, JsonElement>(
+                    StringComparer.OrdinalIgnoreCase);
 
             foreach (
-                var record
-                in records.EnumerateArray())
+                var propiedad
+                in record.EnumerateObject())
             {
-                if (
-                    record.ValueKind !=
-                    JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var diccionario =
-                    new Dictionary<string, JsonElement>(
-                        StringComparer.OrdinalIgnoreCase);
-
-                foreach (
-                    var propiedad
-                    in record.EnumerateObject())
-                {
-                    diccionario[propiedad.Name] =
-                        propiedad.Value.Clone();
-                }
-
-                if (diccionario.Count > 0)
-                {
-                    resultado.Add(
-                        diccionario);
-                }
+                diccionario[propiedad.Name] =
+                    propiedad.Value.Clone();
             }
 
-            return resultado;
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine(
-                $"JSON inválido del MEF: {ex.Message}");
-
-            return resultado;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(
-                $"Error procesando JSON MEF: {ex.Message}");
-
-            return resultado;
-        }
-    }
-
-    // ============================================================
-    // CONSTRUIR EVOLUCIÓN
-    // ============================================================
-
-    private static List<EvolucionPresupuesto>
-        ConstruirEvolucion(
-            List<Dictionary<string, JsonElement>> registros,
-            string? entidad)
-    {
-        var resultado =
-            new List<EvolucionPresupuesto>();
-
-        if (registros.Count == 0)
-        {
-            return resultado;
-        }
-
-        var registro =
-            registros[0];
-
-        for (var anio = 2022; anio <= 2026; anio++)
-        {
-            var pia =
-                ObtenerDecimal(
-                    registro,
-                    $"PIA_{anio}");
-
-            var pim =
-                ObtenerDecimal(
-                    registro,
-                    $"PIM_{anio}");
-
-            var devengado =
-                ObtenerDecimal(
-                    registro,
-                    $"DEVENGADO_{anio}");
-
-            var porcentaje =
-                pim > 0
-                    ? devengado / pim * 100
-                    : 0;
-
             resultado.Add(
-                new EvolucionPresupuesto
-                {
-                    Anio = anio,
-
-                    Entidad =
-                        string.IsNullOrWhiteSpace(entidad)
-                            ? "Todas las entidades"
-                            : entidad,
-
-                    PresupuestoInicial =
-                        pia,
-
-                    PresupuestoModificado =
-                        pim,
-
-                    MontoEjecutado =
-                        devengado,
-
-                    PorcentajeEjecucion =
-                        porcentaje
-                });
+                diccionario);
         }
 
-        return resultado
-            .OrderBy(
-                x => x.Anio)
-            .ToList();
+        return resultado;
     }
 
     // ============================================================
-    // OBTENER DECIMAL
+    // TEXTO
     // ============================================================
 
-    private static decimal ObtenerDecimal(
-        Dictionary<string, JsonElement> registro,
-        string campo)
+    private static string?
+        ObtenerTexto(
+            Dictionary<string, JsonElement> registro,
+            params string[] campos)
+    {
+        foreach (var campo in campos)
+        {
+            if (
+                !registro.TryGetValue(
+                    campo,
+                    out var valor))
+            {
+                continue;
+            }
+
+            if (
+                valor.ValueKind ==
+                JsonValueKind.Null)
+            {
+                continue;
+            }
+
+            var texto =
+                valor.ToString()?.Trim();
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    texto))
+            {
+                return texto;
+            }
+        }
+
+        return null;
+    }
+
+    // ============================================================
+    // DECIMAL
+    // ============================================================
+
+    private static decimal
+        ObtenerDecimal(
+            Dictionary<string, JsonElement> registro,
+            string campo)
     {
         if (
             !registro.TryGetValue(
                 campo,
                 out var valor))
         {
-            return 0;
+            return 0m;
         }
 
-        try
+        if (
+            valor.ValueKind ==
+            JsonValueKind.Number)
         {
             if (
-                valor.ValueKind ==
-                JsonValueKind.Number)
+                valor.TryGetDecimal(
+                    out var numero))
             {
-                if (
-                    valor.TryGetDecimal(
-                        out var numero))
-                {
-                    return numero;
-                }
-
-                if (
-                    valor.TryGetDouble(
-                        out var numeroDouble))
-                {
-                    return
-                        (decimal)numeroDouble;
-                }
-            }
-
-            if (
-                valor.ValueKind ==
-                JsonValueKind.String)
-            {
-                var texto =
-                    valor.GetString();
-
-                if (
-                    string.IsNullOrWhiteSpace(
-                        texto))
-                {
-                    return 0;
-                }
-
-                texto =
-                    texto
-                        .Replace(",", "")
-                        .Trim();
-
-                if (
-                    decimal.TryParse(
-                        texto,
-                        NumberStyles.Any,
-                        CultureInfo.InvariantCulture,
-                        out var numero))
-                {
-                    return numero;
-                }
-
-                if (
-                    decimal.TryParse(
-                        texto,
-                        NumberStyles.Any,
-                        CultureInfo.GetCultureInfo(
-                            "es-PE"),
-                        out numero))
-                {
-                    return numero;
-                }
+                return numero;
             }
         }
-        catch
-        {
-            // El campo se interpreta como cero.
-        }
 
-        return 0;
-    }
+        var texto =
+            valor.ToString()?.Trim();
 
-    // ============================================================
-    // ESCAPAR SQL
-    // ============================================================
-
-    private static string EscaparSql(
-        string texto)
-    {
-        return texto
-            .Replace(
-                "'",
-                "''",
-                StringComparison.Ordinal);
-    }
-
-    // ============================================================
-    // NORMALIZAR
-    // ============================================================
-
-    private static string Normalizar(
-        string? texto)
-    {
         if (
             string.IsNullOrWhiteSpace(
                 texto))
         {
-            return "";
+            return 0m;
         }
 
-        return texto
-            .Trim()
-            .ToUpperInvariant()
-            .Replace("Á", "A")
-            .Replace("É", "E")
-            .Replace("Í", "I")
-            .Replace("Ó", "O")
-            .Replace("Ú", "U")
-            .Replace("Ü", "U")
-            .Replace("Ñ", "N");
+        /*
+         * Los campos del diccionario del MEF son text.
+         * Permitimos tanto 12345.67 como 12,345.67.
+         */
+        texto =
+            texto.Replace(
+                ",",
+                "");
+
+        if (
+            decimal.TryParse(
+                texto,
+                NumberStyles.Any,
+                CultureInfo.InvariantCulture,
+                out var resultado))
+        {
+            return resultado;
+        }
+
+        return 0m;
+    }
+
+    // ============================================================
+    // INT
+    // ============================================================
+
+    private static int?
+        ObtenerNullableInt(
+            Dictionary<string, JsonElement> registro,
+            string campo)
+    {
+        var texto =
+            ObtenerTexto(
+                registro,
+                campo);
+
+        if (
+            string.IsNullOrWhiteSpace(
+                texto))
+        {
+            return null;
+        }
+
+        return int.TryParse(
+            texto,
+            out var resultado)
+            ? resultado
+            : null;
     }
 
     // ============================================================
     // LIMPIAR FILTRO
     // ============================================================
 
-    private static string LimpiarFiltro(
-        string? filtro)
+    private static string
+        LimpiarFiltro(
+            string? filtro)
     {
         if (
             string.IsNullOrWhiteSpace(
@@ -787,19 +891,6 @@ public sealed class MefService
             return "";
         }
 
-        var resultado =
-            filtro.Trim();
-
-        // Evitamos que un residuo como "y"
-        // llegue al MEF como entidad.
-        if (
-            resultado.Equals(
-                "y",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "";
-        }
-
-        return resultado;
+        return filtro.Trim();
     }
 }
