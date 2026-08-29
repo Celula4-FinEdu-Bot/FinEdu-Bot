@@ -1,0 +1,857 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using src.Models
+@using src.Services
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+
+@inject NlqService NlqService
+
+<PageTitle>FinEdu-Bot - Monitor de Transparencia</PageTitle>
+
+<div class="page-container">
+
+    <!-- ====================================================== -->
+    <!-- ENCABEZADO -->
+    <!-- ====================================================== -->
+
+    <div class="page-header">
+
+        <div>
+
+            <span class="eyebrow">
+                FINEDU-BOT
+            </span>
+
+            <h1>
+                Monitor de Transparencia
+                <br />
+                Económica y Gasto Público
+            </h1>
+
+            <p class="subtitle">
+                Consulta información presupuestaria del MEF
+                utilizando lenguaje natural.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- ====================================================== -->
+    <!-- CONTENEDOR PRINCIPAL -->
+    <!-- ====================================================== -->
+
+    <div class="query-card">
+
+        <!-- ================================================== -->
+        <!-- CABECERA -->
+        <!-- ================================================== -->
+
+        <div class="query-header">
+
+            <div>
+
+                <span class="section-label">
+                    NATURAL LANGUAGE QUERY
+                </span>
+
+                <h2>
+                    ¿Qué deseas consultar?
+                </h2>
+
+            </div>
+
+            <div class="source-badge">
+                MEF
+            </div>
+
+        </div>
+
+
+        <!-- ================================================== -->
+        <!-- FORMULARIO -->
+        <!-- ================================================== -->
+
+        <div class="query-form">
+
+            <input
+                class="query-input"
+                type="text"
+                @bind="Pregunta"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown"
+                placeholder="Ej. ¿Cuál fue la evolución del presupuesto entre 2017 y 2021?"
+            />
+
+            <button
+                type="button"
+                class="query-button"
+                disabled="@Cargando"
+                @onclick="ConsultarAsync">
+
+                @if (Cargando)
+                {
+                    <span class="spinner"></span>
+
+                    <span>
+                        Consultando...
+                    </span>
+                }
+                else
+                {
+                    <span>
+                        Consultar
+                    </span>
+                }
+
+            </button>
+
+        </div>
+
+
+        <!-- ================================================== -->
+        <!-- EJEMPLOS -->
+        <!-- ================================================== -->
+
+        <div class="examples">
+
+            <span class="examples-title">
+                Ejemplos:
+            </span>
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("¿Cuál fue la evolución del presupuesto entre 2017 y 2021?")'>
+
+                Evolución 2017-2021
+
+            </button>
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("¿Cuál fue el presupuesto de la Municipalidad Distrital de Monzon en 2021?")'>
+
+                Municipalidad de Monzón
+
+            </button>
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("¿Cuánto se devengó en la Municipalidad Distrital de Cerro Azul en 2021?")'>
+
+                Cerro Azul
+
+            </button>
+
+        </div>
+
+
+        <!-- ================================================== -->
+        <!-- RESULTADO -->
+        <!-- ================================================== -->
+
+        @if (Resultado != null)
+        {
+
+            <!-- ============================================== -->
+            <!-- RESUMEN -->
+            <!-- ============================================== -->
+
+            <div class="summary-grid">
+
+                <!-- INTENCIÓN -->
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        INTENCIÓN DETECTADA
+                    </span>
+
+                    <strong>
+
+                        @(string.IsNullOrWhiteSpace(
+                            Resultado.Intent)
+                            ? "No identificada"
+                            : Resultado.Intent)
+
+                    </strong>
+
+                </div>
+
+
+                <!-- ESTADO -->
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        ESTADO
+                    </span>
+
+                    <strong class="@(Resultado.Success
+                        ? "success"
+                        : "error")">
+
+                        @(Resultado.Success
+                            ? "ÉXITO"
+                            : "SIN DATOS")
+
+                    </strong>
+
+                </div>
+
+
+                <!-- FUENTE -->
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        FUENTE
+                    </span>
+
+                    <strong class="source-text">
+                        MEF
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- ============================================== -->
+            <!-- MENSAJE -->
+            <!-- ============================================== -->
+
+            @if (!string.IsNullOrWhiteSpace(
+                Resultado.Message))
+            {
+
+                <div class="message-box @(Resultado.Success
+                    ? "message-success"
+                    : "message-warning")">
+
+                    @Resultado.Message
+
+                </div>
+
+            }
+
+
+            <!-- ============================================== -->
+            <!-- RESULTADOS -->
+            <!-- ============================================== -->
+            <!-- ============================================== -->
+            <!-- RESULTADOS -->
+            <!-- ============================================== -->
+
+            <!-- ============================================== -->
+            <!-- RESULTADOS -->
+            <!-- ============================================== -->
+
+            @if (Resultado?.Evolucion is { Count: > 0 })
+            {
+                <div class="results-container">
+
+                    <!-- CABECERA -->
+                    <div class="results-header">
+
+                        <div>
+
+                            <span class="section-label">
+                                RESULTADOS MEF
+                            </span>
+
+                            <h3>
+                                Evolución presupuestaria 2017 - 2021
+                            </h3>
+
+                        </div>
+
+                        <span class="result-count">
+                            @Resultado.Evolucion.Count registro(s)
+                        </span>
+
+                    </div>
+
+
+                    <!-- ================================================= -->
+                    <!-- TABLA -->
+                    <!-- ================================================= -->
+
+                    <div class="table-wrapper">
+
+                        <table class="results-table">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        AÑO
+                                    </th>
+
+                                    <th>
+                                        ENTIDAD
+                                    </th>
+
+                                    <th>
+                                        NIVEL DE GOBIERNO
+                                    </th>
+
+                                    <th>
+                                        DEPARTAMENTO
+                                    </th>
+
+                                    <th>
+                                        PIA
+                                    </th>
+
+                                    <th>
+                                        PIM
+                                    </th>
+
+                                    <th>
+                                        DEVENGADO
+                                    </th>
+
+                                    <th>
+                                        % EJECUCIÓN
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                                @foreach (
+                                    var registro
+                                    in Resultado.Evolucion)
+                                {
+                                    <!-- ================================= -->
+                                    <!-- 2017 -->
+                                    <!-- ================================= -->
+
+                                    <tr>
+
+                                        <td>
+                                            2017
+                                        </td>
+
+                                        <td class="entity-cell">
+                                            @(registro.EjecutoraNombre
+                                                ?? "Todas las entidades")
+                                        </td>
+
+                                        <td>
+                                            @registro.NivelGobiernoNombre
+                                        </td>
+
+                                        <td>
+                                            @registro.DepartamentoEjecutoraNombre
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pia2017.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pim2017.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Devengado2017.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+
+                                            @{
+                                                var porcentaje2017 =
+                                                    registro.Pim2017 > 0
+                                                        ? (
+                                                            registro.Devengado2017 /
+                                                            registro.Pim2017
+                                                        ) * 100
+                                                        : 0m;
+                                            }
+
+                                            @porcentaje2017.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))%
+
+                                        </td>
+
+                                    </tr>
+
+
+                                    <!-- ================================= -->
+                                    <!-- 2018 -->
+                                    <!-- ================================= -->
+
+                                    <tr>
+
+                                        <td>
+                                            2018
+                                        </td>
+
+                                        <td class="entity-cell">
+                                            @(registro.EjecutoraNombre
+                                                ?? "Todas las entidades")
+                                        </td>
+
+                                        <td>
+                                            @registro.NivelGobiernoNombre
+                                        </td>
+
+                                        <td>
+                                            @registro.DepartamentoEjecutoraNombre
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pia2018.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pim2018.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Devengado2018.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+
+                                            @{
+                                                var porcentaje2018 =
+                                                    registro.Pim2018 > 0
+                                                        ? (
+                                                            registro.Devengado2018 /
+                                                            registro.Pim2018
+                                                        ) * 100
+                                                        : 0m;
+                                            }
+
+                                            @porcentaje2018.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))%
+
+                                        </td>
+
+                                    </tr>
+
+
+                                    <!-- ================================= -->
+                                    <!-- 2019 -->
+                                    <!-- ================================= -->
+
+                                    <tr>
+
+                                        <td>
+                                            2019
+                                        </td>
+
+                                        <td class="entity-cell">
+                                            @(registro.EjecutoraNombre
+                                                ?? "Todas las entidades")
+                                        </td>
+
+                                        <td>
+                                            @registro.NivelGobiernoNombre
+                                        </td>
+
+                                        <td>
+                                            @registro.DepartamentoEjecutoraNombre
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pia2019.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pim2019.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Devengado2019.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+
+                                            @{
+                                                var porcentaje2019 =
+                                                    registro.Pim2019 > 0
+                                                        ? (
+                                                            registro.Devengado2019 /
+                                                            registro.Pim2019
+                                                        ) * 100
+                                                        : 0m;
+                                            }
+
+                                            @porcentaje2019.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))%
+
+                                        </td>
+
+                                    </tr>
+
+
+                                    <!-- ================================= -->
+                                    <!-- 2020 -->
+                                    <!-- ================================= -->
+
+                                    <tr>
+
+                                        <td>
+                                            2020
+                                        </td>
+
+                                        <td class="entity-cell">
+                                            @(registro.EjecutoraNombre
+                                                ?? "Todas las entidades")
+                                        </td>
+
+                                        <td>
+                                            @registro.NivelGobiernoNombre
+                                        </td>
+
+                                        <td>
+                                            @registro.DepartamentoEjecutoraNombre
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pia2020.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pim2020.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Devengado2020.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+
+                                            @{
+                                                var porcentaje2020 =
+                                                    registro.Pim2020 > 0
+                                                        ? (
+                                                            registro.Devengado2020 /
+                                                            registro.Pim2020
+                                                        ) * 100
+                                                        : 0m;
+                                            }
+
+                                            @porcentaje2020.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))%
+
+                                        </td>
+
+                                    </tr>
+
+
+                                    <!-- ================================= -->
+                                    <!-- 2021 -->
+                                    <!-- ================================= -->
+
+                                    <tr>
+
+                                        <td>
+                                            2021
+                                        </td>
+
+                                        <td class="entity-cell">
+                                            @(registro.EjecutoraNombre
+                                                ?? "Todas las entidades")
+                                        </td>
+
+                                        <td>
+                                            @registro.NivelGobiernoNombre
+                                        </td>
+
+                                        <td>
+                                            @registro.DepartamentoEjecutoraNombre
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pia2021.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Pim2021.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+                                            S/
+                                            @registro.Devengado2021.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                        </td>
+
+                                        <td>
+
+                                            @{
+                                                var porcentaje2021 =
+                                                    registro.Pim2021 > 0
+                                                        ? (
+                                                            registro.Devengado2021 /
+                                                            registro.Pim2021
+                                                        ) * 100
+                                                        : 0m;
+                                            }
+
+                                            @porcentaje2021.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))%
+
+                                        </td>
+
+                                    </tr>
+
+                                }
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+            }
+            else if (Resultado != null &&
+                    Resultado.Intent == "EvolucionPresupuesto")
+            {
+                <div class="no-results">
+
+                    <div class="no-results-icon">
+                        !
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            No se encontraron datos.
+                        </h3>
+
+                        <p>
+                            @Resultado.Message
+                        </p>
+
+                    </div>
+
+                </div>
+            }
+        
+
+        
+            else if (!Cargando &&
+                    ConsultaRealizada)
+            {
+
+                <!-- ========================================== -->
+                <!-- SIN RESULTADOS -->
+                <!-- ========================================== -->
+
+                <div class="no-results">
+
+                    <div class="no-results-icon">
+                        !
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            No se encontraron datos.
+                        </h3>
+
+                        <p>
+                            El MEF no devolvió registros para
+                            la consulta realizada.
+                            Verifica el nombre de la entidad
+                            o realiza una consulta presupuestaria.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            }
+
+        }
+
+    </div>
+
+</div>
+
+
+@code {
+
+    // ==========================================================
+    // ESTADO
+    // ==========================================================
+
+    private string Pregunta =
+        "muestrame el registro del año 2017-2021";
+
+    private NlqResponse? Resultado;
+
+    private bool Cargando;
+
+    private bool ConsultaRealizada;
+
+
+    // ==========================================================
+    // CONSULTAR
+    // ==========================================================
+
+    private async Task ConsultarAsync()
+    {
+        if (Cargando)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Pregunta))
+        {
+            return;
+        }
+
+        Cargando = true;
+
+        ConsultaRealizada = false;
+
+        Resultado = null;
+
+        try
+        {
+            Resultado =
+                await NlqService.ProcesarAsync(
+                    Pregunta.Trim(),
+                    CancellationToken.None);
+
+            ConsultaRealizada = true;
+        }
+        catch (Exception ex)
+        {
+            Resultado =
+                new NlqResponse
+                {
+                    Success = false,
+
+                    Intent =
+                        "Error",
+
+                    Message =
+                        $"No fue posible procesar la consulta: {ex.Message}",
+
+                    Evolucion = []
+                };
+
+            ConsultaRealizada = true;
+        }
+        finally
+        {
+            Cargando = false;
+        }
+    }
+
+
+    // ==========================================================
+    // ENTER
+    // ==========================================================
+
+    private async Task HandleKeyDown(
+        KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConsultarAsync();
+        }
+    }
+
+
+    // ==========================================================
+    // USAR EJEMPLO
+    // ==========================================================
+
+    private void UsarEjemplo(
+        string texto)
+    {
+        Pregunta = texto;
+
+        Resultado = null;
+
+        ConsultaRealizada = false;
+    }
+
+}
