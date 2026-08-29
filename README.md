@@ -57,15 +57,17 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
     ├── ai-testing-ci.yml         # Pipeline IA Ops: Pruebas unitarias de prompts y LLMs
     └── codeql.yml                # Pipeline DevSecOps: Análisis estático de seguridad (SAST)
 src/
-├── frontend/                     # Microfrontend (NLQ)
-├── n8n-workflows/                # Flujos exportados (JSON) - producción y templates
+├── frontend/                     # Espacio base del frontend compartido del repo
+├── n8n-workflows/                # Carpeta del backend y workflows n8n de Backend-Canchari
+│   ├── frontend/                 # index.html servido por Express
+│   ├── infrastructure/           # docker-compose y .env.example del backend
+│   ├── src/                      # Código TypeScript del backend
+│   ├── package.json              # Scripts Node del backend
+│   └── tsconfig.json             # Configuración TypeScript del backend
 ├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
 └── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
-finedu-bot-backend/
-├── .env.example                  # Plantilla de variables de entorno del backend
-└── src/server.ts                 # Punto de entrada del servidor (Node.js + Express)
-infrastructure/                   # Recursos de infraestructura del proyecto
 .gitignore
+infrastructure/                   # Recursos compartidos del proyecto
 LICENSE
 README.md
 ```
@@ -80,11 +82,11 @@ README.md
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd finedu-bot-backend
+cd FinEdu-Bot/src/n8n-workflows
 npm install
 ```
 
-Crear un archivo `.env` en la raíz del backend, siguiendo la plantilla de `.env.example`:
+Crear un archivo `.env` en `src/n8n-workflows`, siguiendo la plantilla de `src/n8n-workflows/infrastructure/.env.example`:
 
 ```env
 NODE_ENV=development
