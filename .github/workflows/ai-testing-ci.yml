@@ -5,10 +5,11 @@ on:
     branches: [main, develop]
 
   push:
-    branches: [main, develop]
+    branches: [main, develop, QA-Marino]
     paths:
       - "src/ia-ops/**"
       - "src/frontend/**"
+      - "src/n8n-workflows/**"
       - ".github/workflows/ai-testing-ci.yml"
 
 permissions:
@@ -106,3 +107,19 @@ jobs:
       - name: Ejecutar pruebas QA
         run: |
           pytest src/ia-ops/tests -v
+
+      # HU-12 - Registrar y controlar errores
+      - name: Instalar dependencias del backend
+        working-directory: src/n8n-workflows
+        run: |
+          npm install
+
+      - name: Ejecutar prueba HU-12 - Manejo de errores
+        working-directory: src/n8n-workflows
+        run: |
+          npx tsx src/shared/errors/AppError.test.ts
+
+      - name: Verificar compilación TypeScript
+        working-directory: src/n8n-workflows
+        run: |
+          npm run check
