@@ -1,14 +1,27 @@
 
+import os
+
 from playwright.sync_api import sync_playwright
 
 
 def test_hu20_interfaz():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page(viewport={"width": 1440, "height": 900})
+
+        # En GitHub Actions no existe interfaz gráfica.
+        # Localmente se abre el navegador para poder visualizar la prueba.
+        headless = os.getenv("CI") == "true"
+
+        browser = p.chromium.launch(headless=headless)
+
+        page = browser.new_page(
+            viewport={"width": 1440, "height": 900}
+        )
 
         # 1. Abrir FinEdu-Bot
-        page.goto("http://localhost:5204", wait_until="networkidle")
+        page.goto(
+            "http://localhost:5204",
+            wait_until="networkidle"
+        )
 
         # 2. Verificar que la aplicación cargó
         assert page.title() != ""
@@ -19,18 +32,30 @@ def test_hu20_interfaz():
         ).is_visible()
 
         # 4. Verificar las opciones principales del menú
-        assert page.get_by_text("Presupuesto", exact=True).is_visible()
-        assert page.get_by_text("Proyectos", exact=True).is_visible()
+        assert page.get_by_text(
+            "Presupuesto",
+            exact=True
+        ).is_visible()
+
+        assert page.get_by_text(
+            "Proyectos",
+            exact=True
+        ).is_visible()
 
         # 5. Verificar la caja de consulta
         caja = page.get_by_role("textbox")
         assert caja.is_visible()
 
         # 6. Realizar una consulta de prueba
-        caja.fill("¿Cuál es el presupuesto de la municipalidad?")
+        caja.fill(
+            "¿Cuál es el presupuesto de la municipalidad?"
+        )
 
         # 7. Verificar que el botón Consultar existe
-        boton = page.get_by_role("button", name="Consultar")
+        boton = page.get_by_role(
+            "button",
+            name="Consultar"
+        )
         assert boton.is_visible()
 
         # 8. Captura antes de consultar
@@ -51,9 +76,10 @@ def test_hu20_interfaz():
             full_page=True
         )
 
-        # 12. Mantener el navegador abierto 30 segundos
-        page.wait_for_timeout(30000)
+        # 12. Solo mantener el navegador abierto cuando
+        # ejecutamos la prueba localmente.
+        if not headless:
+            page.wait_for_timeout(30000)
 
-        # 13. Cerrar navegador
         browser.close()
 
