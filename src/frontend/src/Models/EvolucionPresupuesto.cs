@@ -3,7 +3,7 @@ namespace src.Models;
 public sealed class EvolucionPresupuesto
 {
     // Identificación
-   public string? KeyValue { get; set; }
+    public string? KeyValue { get; set; }
 
     public string? NivelGobierno { get; set; }
     public string? NivelGobiernoNombre { get; set; }
