@@ -1,305 +1,1150 @@
 @page "/contrataciones"
+@rendermode InteractiveServer
+
+@using src.Services
+@using Microsoft.AspNetCore.Components.Web
+@using System.Globalization
+
+@inject OeceService OeceService
 
 <PageTitle>Contrataciones | FinEdu-Bot</PageTitle>
 
-<div class="page-header">
 
-    <div>
+<div class="page-container">
+
+    <!-- ===================================================== -->
+    <!-- ENCABEZADO -->
+    <!-- ===================================================== -->
+
+    <div class="page-header">
 
         <span class="eyebrow">
             MICROFRONTEND OECE
         </span>
 
         <h1>
-            Contrataciones adjudicadas
+            Explorador de contrataciones
         </h1>
 
-        <p>
-            Consulta de contrataciones públicas,
-            descargas masivas y registros por OCID.
+        <p class="subtitle">
+            Consulta información del Plan Anual de Contrataciones
+            mediante el dataset local OECE 2018.
         </p>
 
     </div>
 
-</div>
 
-<section class="oece-microfrontend">
+    <!-- ===================================================== -->
+    <!-- TARJETA PRINCIPAL -->
+    <!-- ===================================================== -->
 
-    <div class="oece-header">
+    <section class="query-card">
 
-        <div>
-
-            <span class="oece-label">
-                OECE
-            </span>
-
-            <h2>
-                Explorador de contrataciones
-            </h2>
-
-        </div>
-
-        <span class="connection-status">
-            Fuente externa
-        </span>
-
-    </div>
-
-    <div class="oece-search">
-
-        <div class="search-field">
-
-            <label>
-                Año
-            </label>
-
-            <select @bind="year">
-
-                @for (var currentYear = 2026;
-                      currentYear >= 2020;
-                      currentYear--)
-                {
-                    <option value="@currentYear">
-                        @currentYear
-                    </option>
-                }
-
-            </select>
-
-        </div>
-
-        <div class="search-field">
-
-            <label>
-                Mes
-            </label>
-
-            <select @bind="month">
-
-                @for (var currentMonth = 1;
-                      currentMonth <= 12;
-                      currentMonth++)
-                {
-                    <option value="@currentMonth">
-                        @GetMonthName(currentMonth)
-                    </option>
-                }
-
-            </select>
-
-        </div>
-
-        <div class="search-field ocid-field">
-
-            <label>
-                OCID
-            </label>
-
-            <input
-                @bind="ocid"
-                placeholder="ocds-dgv273-seacev2-3496677" />
-
-        </div>
-
-        <button
-            class="primary-button"
-            @onclick="Search">
-            Buscar
-        </button>
-
-    </div>
-
-    @if (!string.IsNullOrWhiteSpace(message))
-    {
-        <div class="info-message">
-            @message
-        </div>
-    }
-
-    <div class="oece-grid">
-
-        <div class="oece-card">
-
-            <div class="oece-card-icon">
-                ↓
-            </div>
-
-            <h3>
-                Descarga masiva
-            </h3>
-
-            <p>
-                Preparado para consultar el archivo
-                de descarga masiva correspondiente
-                al año y mes seleccionado.
-            </p>
-
-            <button
-                class="secondary-button"
-                @onclick="DownloadMassive">
-                Obtener descarga
-            </button>
-
-        </div>
-
-        <div class="oece-card">
-
-            <div class="oece-card-icon">
-                ≡
-            </div>
-
-            <h3>
-                Archivos por período
-            </h3>
-
-            <p>
-                Permite mostrar los archivos de
-                contrataciones agrupados por año y mes.
-            </p>
-
-            <button
-                class="secondary-button"
-                @onclick="ListFiles">
-                Ver archivos
-            </button>
-
-        </div>
-
-        <div class="oece-card">
-
-            <div class="oece-card-icon">
-                #
-            </div>
-
-            <h3>
-                Consulta por OCID
-            </h3>
-
-            <p>
-                Consulta individual de un proceso de
-                contratación mediante su identificador OCID.
-            </p>
-
-            <button
-                class="secondary-button"
-                @onclick="SearchOcid">
-                Consultar OCID
-            </button>
-
-        </div>
-
-    </div>
-
-    <div class="oece-preview">
-
-        <div class="preview-header">
+        <div class="query-header">
 
             <div>
 
                 <span class="section-label">
-                    DATA INTERACTION
+                    OECE / PAC 2018
                 </span>
 
                 <h2>
-                    Resultado
+                    ¿Qué deseas consultar?
                 </h2>
 
             </div>
 
-            <span class="preview-source">
-                OECE API
-            </span>
+            <div class="source-badge">
+                OECE
+            </div>
 
         </div>
 
-        @if (string.IsNullOrWhiteSpace(ocid))
+
+        <!-- ================================================= -->
+        <!-- CONSULTA LIBRE -->
+        <!-- ================================================= -->
+
+        <div class="query-form">
+
+            <input
+                class="query-input"
+                type="text"
+                @bind="Texto"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown"
+                placeholder="Ej. Municipalidad Distrital de Chambara"
+                disabled="@Cargando" />
+
+
+            <button
+                type="button"
+                class="query-button"
+                @onclick="BuscarAsync"
+                disabled="@Cargando">
+
+                @if (Cargando)
+                {
+                    <span class="spinner"></span>
+
+                    <span>
+                        Consultando...
+                    </span>
+                }
+                else
+                {
+                    <span>
+                        Consultar
+                    </span>
+                }
+
+            </button>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- FILTROS -->
+        <!-- ================================================= -->
+
+        <div class="filters-grid">
+
+            <!-- AÑO -->
+
+            <div class="filter-field">
+
+                <label>
+                    Año
+                </label>
+
+                <select @bind="Anio">
+
+                    <option value="">
+                        Todos
+                    </option>
+
+                    <option value="2018">
+                        2018
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- DEPARTAMENTO -->
+
+            <div class="filter-field">
+
+                <label>
+                    Departamento
+                </label>
+
+                <input
+                    type="text"
+                    @bind="Departamento"
+                    placeholder="Ej. LIMA" />
+
+            </div>
+
+
+            <!-- ENTIDAD -->
+
+            <div class="filter-field">
+
+                <label>
+                    Entidad
+                </label>
+
+                <input
+                    type="text"
+                    @bind="Entidad"
+                    placeholder="Ej. SUNAT" />
+
+            </div>
+
+
+            <!-- TIPO DE PROCESO -->
+
+            <div class="filter-field">
+
+                <label>
+                    Tipo de proceso
+                </label>
+
+                <input
+                    type="text"
+                    @bind="TipoProceso"
+                    placeholder="Ej. Adjudicación Simplificada" />
+
+            </div>
+
+
+            <!-- OBJETO -->
+
+            <div class="filter-field">
+
+                <label>
+                    Objeto contractual
+                </label>
+
+                <input
+                    type="text"
+                    @bind="ObjetoContractual"
+                    placeholder="Ej. Bien" />
+
+            </div>
+
+
+            <!-- MES -->
+
+            <div class="filter-field">
+
+                <label>
+                    Mes previsto
+                </label>
+
+                <select @bind="Mes">
+
+                    <option value="">
+                        Todos
+                    </option>
+
+                    @for (
+                        var mes = 1;
+                        mes <= 12;
+                        mes++)
+                    {
+                        <option value="@mes">
+                            @GetMonthName(mes)
+                        </option>
+                    }
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- EJEMPLOS -->
+        <!-- ================================================= -->
+
+        <div class="examples">
+
+            <span class="examples-title">
+                Ejemplos:
+            </span>
+
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("Municipalidad Distrital de Chambara")'>
+
+                Municipalidad de Chambara
+
+            </button>
+
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("Fuerza Aerea del Peru")'>
+
+                Fuerza Aérea del Perú
+
+            </button>
+
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("Gobierno Regional de Cusco")'>
+
+                Gobierno Regional de Cusco
+
+            </button>
+
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("SUNAT")'>
+
+                SUNAT
+
+            </button>
+
+
+            <button
+                type="button"
+                class="example-button"
+                @onclick='() => UsarEjemplo("Subasta Inversa Electrónica")'>
+
+                Subasta Inversa
+
+            </button>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- MENSAJE -->
+        <!-- ================================================= -->
+
+        @if (!string.IsNullOrWhiteSpace(Mensaje))
         {
-            <div class="empty-preview">
+            <div class="info-message">
 
-                <strong>
-                    Sin consulta
-                </strong>
-
-                <p>
-                    Ingresa un OCID o selecciona
-                    un período para iniciar.
-                </p>
+                @Mensaje
 
             </div>
         }
-        else
-        {
-            <div class="ocid-result">
 
-                <span>
-                    OCID consultado
-                </span>
+
+        <!-- ================================================= -->
+        <!-- ERROR -->
+        <!-- ================================================= -->
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="error-message">
 
                 <strong>
-                    @ocid
+                    Error
                 </strong>
 
-                <small>
-                    La integración con la API OECE
-                    será conectada en la siguiente etapa.
-                </small>
+                <div>
+                    @Error
+                </div>
 
             </div>
         }
 
-    </div>
 
-</section>
+        <!-- ================================================= -->
+        <!-- RESUMEN -->
+        <!-- ================================================= -->
+
+        @if (
+            Resultado != null &&
+            Resultado.Success)
+        {
+            <div class="summary-grid">
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        COINCIDENCIAS
+                    </span>
+
+                    <strong class="summary-value">
+                        @Resultado.Total
+                    </strong>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        MOSTRADOS
+                    </span>
+
+                    <strong class="summary-value">
+                        @Resultado.Records.Count
+                    </strong>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <span class="summary-label">
+                        FUENTE
+                    </span>
+
+                    <strong class="summary-source">
+                        OECE / PAC 2018
+                    </strong>
+
+                </div>
+
+            </div>
+        }
+
+
+        <!-- ================================================= -->
+        <!-- RESULTADOS -->
+        <!-- ================================================= -->
+
+        @if (
+            Resultado != null &&
+            Resultado.Success &&
+            Resultado.Records.Count > 0)
+        {
+            <div class="results-container">
+
+                <div class="results-header">
+
+                    <div>
+
+                        <span class="section-label">
+                            RESULTADOS OECE
+                        </span>
+
+                        <h3>
+                            Procesos de contratación
+                        </h3>
+
+                    </div>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table class="results-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    AÑO
+                                </th>
+
+                                <th>
+                                    ENTIDAD
+                                </th>
+
+                                <th>
+                                    RUC
+                                </th>
+
+                                <th>
+                                    N. REFERENCIA
+                                </th>
+
+                                <th>
+                                    DESCRIPCIÓN DEL PROCESO
+                                </th>
+
+                                <th>
+                                    TIPO DE PROCESO
+                                </th>
+
+                                <th>
+                                    OBJETO
+                                </th>
+
+                                <th>
+                                    ITEM
+                                </th>
+
+                                <th>
+                                    DESCRIPCIÓN DEL ITEM
+                                </th>
+
+                                <th>
+                                    CANTIDAD
+                                </th>
+
+                                <th>
+                                    UNIDAD
+                                </th>
+
+                                <th>
+                                    DEPARTAMENTO
+                                </th>
+
+                                <th>
+                                    PROVINCIA
+                                </th>
+
+                                <th>
+                                    DISTRITO
+                                </th>
+
+                                <th>
+                                    MES PREVISTO
+                                </th>
+
+                                <th>
+                                    FECHA PUBLICACIÓN
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            @foreach (
+                                var registro
+                                in Resultado.Records)
+                            {
+                                <tr>
+
+                                    <td>
+                                        @registro.Anio
+                                    </td>
+
+
+                                    <td class="entity-cell">
+
+                                        @(
+                                            registro.Entidad
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+                                        @(
+                                            registro.RucEntidad
+                                            ?? "-"
+                                        )
+                                    </td>
+
+
+                                    <td>
+                                        @(
+                                            registro.NumeroReferencia
+                                            ?? "-"
+                                        )
+                                    </td>
+
+
+                                    <td class="description-cell">
+
+                                        @(
+                                            registro.DescripcionProceso
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.TipoProcesoSeleccion
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+                                        @(
+                                            registro.ObjetoContractual
+                                            ?? "-"
+                                        )
+                                    </td>
+
+
+                                    <td>
+                                        @(
+                                            registro.NumeroItem
+                                            ?? "-"
+                                        )
+                                    </td>
+
+
+                                    <td class="description-cell">
+
+                                        @(
+                                            registro.DescripcionItem
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.Cantidad?.ToString(
+                                                "N2",
+                                                CultureInfo.GetCultureInfo(
+                                                    "es-PE"))
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.UnidadMedida
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.Departamento
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.Provincia
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.Distrito
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.MesPrevisto.HasValue
+                                                ? GetMonthName(
+                                                    registro.MesPrevisto.Value)
+                                                : "-"
+                                        )
+
+                                    </td>
+
+
+                                    <td>
+
+                                        @(
+                                            registro.FechaPublicacion
+                                            ?? "-"
+                                        )
+
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+        }
+        else if (
+            Resultado != null &&
+            Resultado.Success &&
+            Resultado.Records.Count == 0)
+        {
+            <div class="no-results">
+
+                <div class="no-results-icon">
+                    !
+                </div>
+
+                <div>
+
+                    <h3>
+                        No se encontraron procesos
+                    </h3>
+
+                    <p>
+                        No existen coincidencias con los filtros seleccionados.
+                    </p>
+
+                </div>
+
+            </div>
+        }
+
+    </section>
+
+</div>
+
+
+<style>
+
+    .page-container {
+        min-height: 100vh;
+        padding: 35px 5%;
+        background: #f4f7fb;
+        color: #102a56;
+    }
+
+    .page-header {
+        max-width: 1200px;
+        margin: 0 auto 24px;
+    }
+
+    .eyebrow {
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+    }
+
+    .page-header h1 {
+        margin: 8px 0;
+        font-size: 38px;
+        font-weight: 700;
+    }
+
+    .subtitle {
+        color: #52627a;
+        font-size: 16px;
+    }
+
+    .query-card {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border: 1px solid #dce3ee;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow:
+            0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .query-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+
+    .section-label {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        color: #2563eb;
+    }
+
+    .query-header h2 {
+        margin: 8px 0 0;
+        font-size: 29px;
+    }
+
+    .source-badge {
+        background: #eff6ff;
+        color: #2563eb;
+        font-weight: 800;
+        padding: 10px 16px;
+        border-radius: 9px;
+    }
+
+    .query-form {
+        display: flex;
+        gap: 10px;
+    }
+
+    .query-input {
+        flex: 1;
+        height: 52px;
+        border: 1px solid #d6deeb;
+        border-radius: 10px;
+        padding: 0 16px;
+        font-size: 15px;
+        outline: none;
+    }
+
+    .query-button {
+        height: 52px;
+        border: none;
+        border-radius: 10px;
+        padding: 0 26px;
+        background: #2563eb;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .query-button:disabled {
+        opacity: .65;
+        cursor: not-allowed;
+    }
+
+    .filters-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+        gap: 15px;
+        margin-top: 22px;
+    }
+
+    .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .filter-field label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+    }
+
+    .filter-field input,
+    .filter-field select {
+        height: 42px;
+        border: 1px solid #d6deeb;
+        border-radius: 8px;
+        padding: 0 10px;
+        background: white;
+    }
+
+    .examples {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 18px;
+    }
+
+    .examples-title {
+        color: #64748b;
+        font-size: 14px;
+    }
+
+    .example-button {
+        border: 1px solid #dbe3ef;
+        background: #f8fafc;
+        color: #334155;
+        border-radius: 7px;
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+
+    .info-message {
+        margin-top: 20px;
+        padding: 14px;
+        border-radius: 10px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e3a8a;
+    }
+
+    .error-message {
+        margin-top: 20px;
+        padding: 14px;
+        border-radius: 10px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+        gap: 15px;
+        margin-top: 24px;
+    }
+
+    .summary-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px;
+    }
+
+    .summary-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 800;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .summary-value {
+        font-size: 26px;
+    }
+
+    .summary-source {
+        color: #2563eb;
+    }
+
+    .results-container {
+        margin-top: 26px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .results-header {
+        padding: 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .results-header h3 {
+        margin: 6px 0 0;
+        font-size: 21px;
+    }
+
+    .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .results-table {
+        width: 100%;
+        min-width: 1900px;
+        border-collapse: collapse;
+    }
+
+    .results-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 800;
+        text-align: left;
+        padding: 13px;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .results-table td {
+        padding: 12px 13px;
+        border-bottom: 1px solid #edf2f7;
+        color: #334155;
+        font-size: 12px;
+        vertical-align: top;
+    }
+
+    .results-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .entity-cell {
+        min-width: 280px;
+        font-weight: 700;
+    }
+
+    .description-cell {
+        min-width: 320px;
+        white-space: normal !important;
+    }
+
+    .no-results {
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 20px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+    }
+
+    .no-results-icon {
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #f59e0b;
+        color: white;
+        font-weight: 800;
+    }
+
+    .spinner {
+        width: 15px;
+        height: 15px;
+        border: 2px solid rgba(255,255,255,.4);
+        border-top-color: white;
+        border-radius: 50%;
+        display: inline-block;
+        animation: spin .8s linear infinite;
+        margin-right: 7px;
+    }
+
+    @@keyframes spin {
+
+        to {
+            transform: rotate(360deg);
+        }
+
+    }
+
+    @@media (max-width: 800px) {
+
+        .query-form {
+            flex-direction: column;
+        }
+
+        .query-button {
+            width: 100%;
+        }
+
+        .filters-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+    }
+
+</style>
+
 
 @code {
 
-    private int year = 2026;
+    private string Texto = "";
 
-    private int month = DateTime.Now.Month;
+    private string Anio = "";
 
-    private string ocid = string.Empty;
+    private string Departamento = "";
 
-    private string message = string.Empty;
+    private string Entidad = "";
 
-    private void Search()
+    private string TipoProceso = "";
+
+    private string ObjetoContractual = "";
+
+    private string Mes = "";
+
+    private bool Cargando;
+
+    private string Mensaje = "";
+
+    private string Error = "";
+
+    private OeceSearchResult? Resultado;
+
+
+    // ============================================================
+    // BUSCAR
+    // ============================================================
+
+    private async Task BuscarAsync()
     {
-        message =
-            $"Consulta preparada para {GetMonthName(month)} de {year}.";
-    }
-
-    private void DownloadMassive()
-    {
-        message =
-            $"La descarga masiva para {GetMonthName(month)} de {year} " +
-            "queda preparada para conectarse al endpoint OECE.";
-    }
-
-    private void ListFiles()
-    {
-        message =
-            $"Se solicitará el listado de archivos agrupados " +
-            $"para {year}.";
-    }
-
-    private void SearchOcid()
-    {
-        if (string.IsNullOrWhiteSpace(ocid))
+        if (Cargando)
         {
-            message =
-                "Ingresa un OCID para realizar la consulta.";
-
             return;
         }
 
-        message =
-            $"OCID preparado para consulta: {ocid}";
+        Cargando = true;
+
+        Mensaje = "";
+
+        Error = "";
+
+        Resultado = null;
+
+        try
+        {
+            int? anio =
+                int.TryParse(
+                    Anio,
+                    out var anioValue)
+                    ? anioValue
+                    : null;
+
+
+            int? mes =
+                int.TryParse(
+                    Mes,
+                    out var mesValue)
+                    ? mesValue
+                    : null;
+
+
+            Resultado =
+                await OeceService.BuscarAsync(
+                    texto: Texto,
+                    anio: anio,
+                    departamento: Departamento,
+                    entidad: Entidad,
+                    tipoProceso: TipoProceso,
+                    objetoContractual: ObjetoContractual,
+                    mes: mes,
+                    limite: 100,
+                    cancellationToken:
+                        CancellationToken.None);
+
+
+            if (Resultado.Success)
+            {
+                Mensaje =
+                    Resultado.Message;
+            }
+            else
+            {
+                Error =
+                    Resultado.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            Error =
+                $"No fue posible consultar el Excel OECE: {ex.Message}";
+        }
+        finally
+        {
+            Cargando = false;
+        }
     }
+
+
+    // ============================================================
+    // ENTER
+    // ============================================================
+
+    private async Task HandleKeyDown(
+        KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await BuscarAsync();
+        }
+    }
+
+
+    // ============================================================
+    // EJEMPLO
+    // ============================================================
+
+    private async Task UsarEjemplo(
+        string texto)
+    {
+        Texto = texto;
+
+        await BuscarAsync();
+    }
+
+
+    // ============================================================
+    // MES
+    // ============================================================
 
     private static string GetMonthName(
         int month)
     {
-        return new System.Globalization.CultureInfo("es-PE")
+        return CultureInfo
+            .GetCultureInfo("es-PE")
             .DateTimeFormat
             .GetMonthName(month);
     }
+
 }

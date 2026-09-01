@@ -14,6 +14,7 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<MefService>();
 builder.Services.AddScoped<NlqService>();
+builder.Services.AddScoped<OeceService>();
 
 
 var app = builder.Build();

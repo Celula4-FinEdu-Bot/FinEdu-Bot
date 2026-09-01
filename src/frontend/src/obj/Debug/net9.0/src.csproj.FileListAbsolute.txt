@@ -7,6 +7,8 @@ C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\n
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\src.runtimeconfig.json
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\src.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\src.pdb
+C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\DocumentFormat.OpenXml.dll
+C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\DocumentFormat.OpenXml.Framework.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\Humanizer.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\Microsoft.Bcl.AsyncInterfaces.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\Microsoft.Build.Locator.dll
@@ -39,6 +41,7 @@ C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\n
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\System.Composition.Hosting.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\System.Composition.Runtime.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\System.Composition.TypedParts.dll
+C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\System.IO.Packaging.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\System.Text.Json.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\cs\Microsoft.CodeAnalysis.resources.dll
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\bin\Debug\net9.0\de\Microsoft.CodeAnalysis.resources.dll
