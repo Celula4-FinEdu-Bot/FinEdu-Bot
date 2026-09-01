@@ -1,9 +1,6 @@
 name: SAST - Analisis Estatico de Seguridad
 
 on:
-  # Sin filtro de "paths": CodeQL analiza el repositorio completo,
-  # y como puede ser required check, debe correr siempre para no
-  # quedar colgado en "Expected - Waiting for status".
   pull_request:
     branches: [main, develop]
   push:
@@ -21,11 +18,8 @@ jobs:
 
     strategy:
       fail-fast: false
-      # Matriz fija (no dinamica): las categorias de CodeQL deben ser
-      # siempre las mismas entre main y cada PR, o GitHub no puede
-      # comparar los resultados ("configuration not found on main").
       matrix:
-        language: ["javascript-typescript", "python"]
+        language: ["csharp"]
 
     steps:
       - name: Checkout del repositorio
@@ -34,18 +28,13 @@ jobs:
       - name: Verificar si hay codigo real para este lenguaje
         id: check
         run: |
-          if [ "${{ matrix.language }}" = "javascript-typescript" ]; then
-            MATCH=$(find . -path "*/node_modules" -prune -o -type f \( -iname "*.ts" -o -iname "*.tsx" -o -iname "*.js" -o -iname "*.jsx" \) -print | head -1)
-          elif [ "${{ matrix.language }}" = "python" ]; then
-            MATCH=$(find . -path "*/node_modules" -prune -o -type f -iname "*.py" -print | head -1)
-          fi
-
+          MATCH=$(find . -path "*/node_modules" -prune -o -path "*/bin" -prune -o -path "*/obj" -prune -o -type f -iname "*.cs" -print | head -1)
           if [ -n "$MATCH" ]; then
             echo "has_code=true" >> "$GITHUB_OUTPUT"
-            echo "Codigo encontrado para ${{ matrix.language }}: $MATCH"
+            echo "Codigo encontrado: $MATCH"
           else
             echo "has_code=false" >> "$GITHUB_OUTPUT"
-            echo "Aun no hay codigo ${{ matrix.language }} en el repositorio. Se omite el analisis."
+            echo "Aun no hay codigo C# en el repositorio. Se omite el analisis."
           fi
 
       - name: Inicializar CodeQL

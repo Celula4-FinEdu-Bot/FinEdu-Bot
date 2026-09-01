@@ -1,0 +1,20 @@
+name: SCA - Analisis de Composicion de Software
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Revisar dependencias nuevas o modificadas en el PR
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
