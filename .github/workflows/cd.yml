@@ -1,0 +1,78 @@
+name: CD - Despliegue a Render
+
+# Se dispara solo cuando algo llega a main. Como main ya esta protegido
+# por branch protection (SCA, SAST, frontend-ci, n8n-validate-ci como
+# required checks), para cuando este workflow corre, el codigo YA paso
+# los gates de seguridad y calidad. No hace falta re-validarlo aqui.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-frontend:
+    name: Deploy Frontend (Blazor Server)
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Disparar deploy en Render
+        id: trigger
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}")
+          echo "Respuesta de Render: $RESPONSE"
+          DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.deploy.id')
+          if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" == "null" ]; then
+            echo "No se pudo obtener el deploy_id. Revisar el Deploy Hook."
+            exit 1
+          fi
+          echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+          echo "Deploy disparado con id: $DEPLOY_ID"
+
+      - name: Esperar el estado real del deploy (polling)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
+          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+        run: |
+          MAX_INTENTOS=40      # 40 x 15s = 10 minutos maximo de espera
+          INTENTO=0
+
+          while [ $INTENTO -lt $MAX_INTENTOS ]; do
+            STATUS=$(curl -s \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$SERVICE_ID/deploys/$DEPLOY_ID" \
+              | jq -r '.status')
+
+            echo "Intento $((INTENTO+1))/$MAX_INTENTOS - estado actual: $STATUS"
+
+            case "$STATUS" in
+              live)
+                echo "OK: el deploy termino y esta live."
+                exit 0
+                ;;
+              build_failed|update_failed|canceled|deactivated)
+                echo "El deploy termino con estado: $STATUS. Revisar logs en Render."
+                exit 1
+                ;;
+            esac
+
+            INTENTO=$((INTENTO+1))
+            sleep 15
+          done
+
+          echo "Se agoto el tiempo de espera (10 min) sin confirmar que el deploy este live."
+          exit 1
+
+      - name: Validar salud del servicio
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.FRONTEND_HEALTH_URL }}")
+          echo "HTTP status recibido: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "El frontend no respondio 200 tras el deploy. Revisar logs en Render."
+            exit 1
+          fi
+          echo "OK: frontend saludable en produccion."
