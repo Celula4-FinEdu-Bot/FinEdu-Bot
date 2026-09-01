@@ -1,0 +1,77 @@
+README - Pruebas Automatizadas de QA
+1. Objetivo
+
+Este documento describe las pruebas automatizadas implementadas para validar el funcionamiento de FinEdu-Bot desde el área de Quality Assurance (QA).
+
+Las pruebas permiten verificar el comportamiento esperado del sistema, detectar errores y validar aspectos funcionales y de seguridad.
+
+2. Herramientas utilizadas
+Pytest: ejecución y automatización de pruebas.
+Selenium: automatización y validación del flujo del webhook.
+Playwright: pruebas End-to-End (E2E) de la interfaz de usuario.
+3. Pruebas implementadas
+Pruebas de consultas válidas
+
+Archivo: test_valid_questions.py
+
+Verifica que el sistema procese correctamente consultas válidas.
+
+Pruebas de consultas inválidas
+
+Archivo: test_invalid_questions.py
+
+Verifica el comportamiento del sistema frente a consultas inválidas o no permitidas.
+
+Pruebas de Prompt Injection
+
+Archivo: test_prompt_injection.py
+
+Evalúa el comportamiento del sistema frente a intentos de manipulación mediante instrucciones maliciosas.
+
+Pruebas de errores de HU-12
+
+Archivo: test_hu12_errors.py
+
+Valida el manejo de errores relacionados con la Historia de Usuario HU-12.
+
+Pruebas Selenium
+
+Archivo: test_selenium_webhook.py
+
+Automatiza la validación del flujo relacionado con el webhook utilizando Selenium.
+
+Pruebas End-to-End de HU-20
+
+Archivo: test_playwright_hu20.py
+
+Valida mediante Playwright el funcionamiento de la interfaz correspondiente a la HU-20.
+
+4. Ejecución de las pruebas
+
+Para ejecutar las pruebas automatizadas desde la raíz del proyecto se utiliza:
+
+py -m pytest src/ia-ops/tests -v
+
+También se pueden ejecutar las pruebas mediante el pipeline de integración continua configurado en GitHub Actions.
+
+5. Resultado esperado
+
+Las pruebas deben finalizar correctamente para considerar que las funcionalidades evaluadas cumplen con los criterios definidos para QA.
+
+Los resultados de las ejecuciones deben ser registrados como evidencia del proceso de validación.
+
+6. Integración con CI
+
+Las pruebas automatizadas de QA se encuentran integradas al flujo de GitHub Actions mediante el workflow correspondiente.
+
+Esto permite ejecutar automáticamente las pruebas cuando se realizan cambios en el repositorio y verificar que las modificaciones no introduzcan errores en las funcionalidades evaluadas.
+
+7. Responsabilidad de QA
+
+El área de QA es responsable de:
+
+Diseñar y mantener las pruebas automatizadas.
+Ejecutar las pruebas y analizar sus resultados.
+Registrar evidencias de las pruebas realizadas.
+Identificar y comunicar errores.
+Coordinar la integración de las pruebas con CI/CT.
