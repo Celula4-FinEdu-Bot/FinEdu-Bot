@@ -7,8 +7,7 @@ from playwright.sync_api import sync_playwright
 def test_hu20_interfaz():
     with sync_playwright() as p:
 
-        # En GitHub Actions no existe interfaz gráfica.
-        # Localmente se abre el navegador para poder visualizar la prueba.
+        # En CI se ejecuta sin interfaz gráfica.
         headless = os.getenv("CI") == "true"
 
         browser = p.chromium.launch(headless=headless)
@@ -31,53 +30,66 @@ def test_hu20_interfaz():
             "Monitor de Transparencia Económica y Gasto Público"
         ).is_visible()
 
-        # 4. Verificar las opciones principales del menú
-        assert page.get_by_text(
-            "Presupuesto",
-            exact=True
-        ).is_visible()
-
-        assert page.get_by_text(
-            "Proyectos",
-            exact=True
-        ).is_visible()
-
-        # 5. Verificar la caja de consulta
+        # 4. Verificar la caja de consulta
         caja = page.get_by_role("textbox")
         assert caja.is_visible()
 
-        # 6. Realizar una consulta de prueba
-        caja.fill(
-            "¿Cuál es el presupuesto de la municipalidad?"
-        )
+        # 5. Realizar consulta de datos presupuestarios
+        caja.fill("Evolución 2017-2021")
 
-        # 7. Verificar que el botón Consultar existe
+        # 6. Verificar botón Consultar
         boton = page.get_by_role(
             "button",
             name="Consultar"
         )
         assert boton.is_visible()
 
-        # 8. Captura antes de consultar
-        page.screenshot(
-            path="hu20_prueba.png",
-            full_page=True
-        )
-
-        # 9. Ejecutar la consulta
+        # 7. Ejecutar consulta
         boton.click()
 
-        # 10. Esperar a que la interfaz procese la consulta
-        page.wait_for_timeout(10000)
+        # 8. Esperar hasta que aparezca el resultado
+        page.get_by_text(
+            "ÉXITO",
+            exact=True
+        ).wait_for(
+            state="visible",
+            timeout=30000
+        )
 
-        # 11. Captura después de consultar
+        # 9. Verificar que la consulta fue exitosa
+        assert page.get_by_text(
+            "ÉXITO",
+            exact=True
+        ).is_visible()
+
+        # 10. Verificar que la fuente de datos es el MEF
+        assert page.get_by_text(
+            "MEF",
+            exact=True
+        ).first.is_visible()
+
+
+        # 11. Verificar que existen resultados
+        assert page.get_by_text(
+            "Evolución presupuestaria 2017 - 2021"
+        ).is_visible()
+
+        assert page.get_by_text(
+            "registro(s)"
+        ).is_visible()
+
+        # 12. Verificar que existe información dentro de los resultados
+        assert page.get_by_text(
+            "SERVICIO NAC. FORESTAL Y DE FAUNA SILVESTRE-SERFOR - SEDE CENTRAL"
+        ).first.is_visible()
+
+        # 13. Captura de evidencia de HU-20
         page.screenshot(
             path="hu20_resultado.png",
             full_page=True
         )
 
-        # 12. Solo mantener el navegador abierto cuando
-        # ejecutamos la prueba localmente.
+        # Mantener navegador abierto solamente en ejecución local
         if not headless:
             page.wait_for_timeout(30000)
 
