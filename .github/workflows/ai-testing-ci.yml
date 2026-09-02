@@ -1,18 +1,15 @@
 name: AI Ops & Prompt Security Testing
 
 on:
-  # Sin filtro de "paths" en pull_request: este workflow es required check en main.
-  # Si tuviera paths aquí, un PR que no toque src/ia-ops quedaría bloqueado
-  # indefinidamente en "Expected — Waiting for status".
   pull_request:
     branches: [main, develop]
-    paths:
-      - "src/ia-ops/**"
-      - ".github/workflows/ai-testing-ci.yml"
+
   push:
-    branches: [main, develop]
+    branches: [main, develop, QA-Marino]
     paths:
       - "src/ia-ops/**"
+      - "src/frontend/**"
+      - "src/n8n-workflows/**"
       - ".github/workflows/ai-testing-ci.yml"
 
 permissions:
@@ -20,40 +17,109 @@ permissions:
 
 jobs:
   ai-testing:
-    name: QA de Prompts y Salidas del Modelo
+    name: QA de Prompts, Seguridad y UI
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
 
-      - name: Validar estructura de IA Ops
-        run: |
-          echo "Verificando carpetas esperadas en src/ia-ops..."
-          test -d "src/ia-ops/prompts"
-          test -d "src/ia-ops/tests"
-          test -d "src/ia-ops/config-observability"
-          echo "Estructura de IA Ops válida."
-
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "src/ia-ops/requirements.txt"
 
-      - name: Instalar dependencias
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Validar estructura de IA Ops
+        run: |
+          echo "Verificando carpetas esperadas..."
+
+          test -d "src/ia-ops/prompts"
+          test -d "src/ia-ops/tests"
+          test -d "src/ia-ops/config-observability"
+
+          echo "Estructura de IA Ops válida."
+
+      - name: Instalar dependencias Python
         run: |
           python -m pip install --upgrade pip
-          pip install pytest requests pydantic
-          [ -f src/ia-ops/requirements.txt ] && pip install -r src/ia-ops/requirements.txt || true
+          python -m pip install -r src/ia-ops/requirements.txt
 
-      - name: Ejecutar pruebas de IA (si existen)
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Instalar navegadores de Playwright
         run: |
-          TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null)
-          if [ -n "$TEST_FILES" ]; then
-            pytest src/ia-ops/tests/ -v --tb=short
-          else
-            echo "Aún no hay archivos de prueba en src/ia-ops/tests. Se omite la ejecución."
+          python -m playwright install --with-deps chromium
+
+      - name: Restaurar dependencias .NET
+        run: |
+          dotnet restore src/frontend/src/src.csproj
+
+      - name: Compilar aplicación
+        run: |
+          dotnet build src/frontend/src/src.csproj --configuration Release --no-restore
+
+      - name: Iniciar aplicación .NET
+        run: |
+          nohup dotnet run \
+            --project src/frontend/src/src.csproj \
+            --configuration Release \
+            --no-build \
+            --urls "http://localhost:5204" \
+            > app.log 2>&1 &
+
+          echo "Esperando que la aplicación inicie..."
+
+          for i in {1..30}; do
+            if curl -s http://localhost:5204/ > /dev/null; then
+              echo "Aplicación disponible en http://localhost:5204/"
+              break
+            fi
+
+            echo "Esperando... intento $i/30"
+            sleep 2
+          done
+
+          if ! curl -s http://localhost:5204/ > /dev/null; then
+            echo "ERROR: La aplicación no inició."
+            cat app.log
+            exit 1
           fi
+
+      - name: Verificar archivos de pruebas
+        run: |
+          echo "Buscando pruebas..."
+
+          TEST_FILES=$(find src/ia-ops/tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null || true)
+
+          if [ -n "$TEST_FILES" ]; then
+            echo "Pruebas encontradas:"
+            echo "$TEST_FILES"
+          else
+            echo "No hay archivos de prueba."
+            exit 0
+          fi
+
+      - name: Ejecutar pruebas QA
+        run: |
+          pytest src/ia-ops/tests -v
+
+      # HU-12 - Registrar y controlar errores
+      - name: Instalar dependencias del backend
+        working-directory: src/n8n-workflows
+        run: |
+          npm install
+
+      - name: Ejecutar prueba HU-12 - Manejo de errores
+        working-directory: src/n8n-workflows
+        run: |
+          npx tsx src/shared/errors/AppError.test.ts
+
+      - name: Verificar compilación TypeScript
+        working-directory: src/n8n-workflows
+        run: |
+          npm run check
