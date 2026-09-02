@@ -815,24 +815,30 @@
 
     private bool ConsultaRealizada;
 
-    private int PaginaActual = 1;
+    private int PaginaActual { get; set; } = 1;
 
+    // Cantidad de registros MEF que se muestran por página.
     private const int RegistrosPorPagina = 10;
 
     private int TotalPaginas =>
-        Resultado?.Evolucion == null ||
-        Resultado.Evolucion.Count == 0
-            ? 0
-            : (int)Math.Ceiling(
+        Resultado?.Evolucion is { Count: > 0 }
+            ? (int)Math.Ceiling(
                 Resultado.Evolucion.Count /
-                (double)RegistrosPorPagina);
+                (double)RegistrosPorPagina)
+            : 0;
 
-    private IEnumerable<EvolucionPresupuesto> RegistrosPagina =>
-        Resultado?.Evolucion == null
-            ? Enumerable.Empty<EvolucionPresupuesto>()
-            : Resultado.Evolucion
+    private IEnumerable<EvolucionPresupuesto> RegistrosPagina
+    {
+        get
+        {
+            if (Resultado?.Evolucion == null)
+                return Enumerable.Empty<EvolucionPresupuesto>();
+
+            return Resultado.Evolucion
                 .Skip((PaginaActual - 1) * RegistrosPorPagina)
                 .Take(RegistrosPorPagina);
+        }
+    }
 
 
     // ==========================================================
@@ -841,17 +847,8 @@
 
     private async Task ConsultarAsync()
     {
-        PaginaActual = 1;
-        
-        if (Cargando)
-        {
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(Pregunta))
-        {
             return;
-        }
 
         Cargando = true;
 
@@ -859,32 +856,17 @@
 
         Resultado = null;
 
+        // Cada nueva consulta comienza nuevamente
+        // desde la primera página.
+        PaginaActual = 1;
+
         try
         {
-            Resultado =
-                await NlqService.ProcesarAsync(
-                    Pregunta.Trim(),
-                    PaginaActual,
-                    TamanioPagina,
-                    CancellationToken.None);
-
-            ConsultaRealizada = true;
-        }
-        catch (Exception ex)
-        {
-            Resultado =
-                new NlqResponse
-                {
-                    Success = false,
-
-                    Intent =
-                        "Error",
-
-                    Message =
-                        $"No fue posible procesar la consulta: {ex.Message}",
-
-                    Evolucion = []
-                };
+            Resultado = await NlqService.ProcesarAsync(
+                Pregunta.Trim(),
+                PaginaActual,
+                TamanioPagina,
+                CancellationToken.None);
 
             ConsultaRealizada = true;
         }
@@ -950,15 +932,18 @@
         }
     }
 
+    // =========================================================
+    // CONSULTA
+    // =========================================================
+
 
     // ==========================================================
     // ENTER
     // ==========================================================
 
-    private async Task HandleKeyDown(
-        KeyboardEventArgs e)
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && !Cargando)
         {
             await ConsultarAsync();
         }
@@ -969,16 +954,11 @@
     // USAR EJEMPLO
     // ==========================================================
 
-    private void UsarEjemplo(
-        string texto)
+    private async Task UsarEjemplo(string ejemplo)
     {
-        Pregunta = texto;
+        Pregunta = ejemplo;
 
-        Resultado = null;
-
-        ConsultaRealizada = false;
-
-        PaginaActual = 1;
+        await ConsultarAsync();
     }
 
 }
