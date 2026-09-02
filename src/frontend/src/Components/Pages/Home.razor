@@ -273,7 +273,7 @@
                         </div>
 
                         <span class="result-count">
-                            @Resultado.Evolucion.Count registro(s)
+                            @Resultado.TotalRegistros registro(s)
                         </span>
 
                     </div>
@@ -332,7 +332,7 @@
 
                                 @foreach (
                                     var registro
-                                    in Resultado.Evolucion)
+                                    in RegistrosPagina)
                                 {
                                     <!-- ================================= -->
                                     <!-- 2017 -->
@@ -684,6 +684,50 @@
 
                         </table>
 
+                        @* paginacion *@
+                        @if (TotalPaginas > 1)
+                        {
+                            <div class="pagination-container">
+
+                                <div class="pagination-info">
+                                    Mostrando
+                                    @(((PaginaActual - 1) * RegistrosPorPagina) + 1)
+                                    -
+                                    @(Math.Min(
+                                        PaginaActual * RegistrosPorPagina,
+                                        Resultado?.Evolucion?.Count ?? 0))
+                                    de
+                                    @(Resultado?.Evolucion?.Count ?? 0)
+                                    registros
+                                </div>
+
+                                <div class="pagination-buttons">
+
+                                    <button type="button"
+                                            class="pagination-button"
+                                            @onclick="PaginaAnterior"
+                                            disabled="@(PaginaActual == 1)">
+                                        Anterior
+                                    </button>
+
+                                    <span class="pagination-page">
+                                        Página @PaginaActual de @TotalPaginas
+                                    </span>
+
+                                    <button type="button"
+                                            class="pagination-button"
+                                            @onclick="PaginaSiguiente"
+                                            disabled="@(PaginaActual >= TotalPaginas)">
+                                        Siguiente
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        }
+
+
+
                     </div>
 
                 </div>
@@ -766,8 +810,29 @@
     private NlqResponse? Resultado;
 
     private bool Cargando;
+  
+    private const int TamanioPagina = 10;
 
     private bool ConsultaRealizada;
+
+    private int PaginaActual = 1;
+
+    private const int RegistrosPorPagina = 10;
+
+    private int TotalPaginas =>
+        Resultado?.Evolucion == null ||
+        Resultado.Evolucion.Count == 0
+            ? 0
+            : (int)Math.Ceiling(
+                Resultado.Evolucion.Count /
+                (double)RegistrosPorPagina);
+
+    private IEnumerable<EvolucionPresupuesto> RegistrosPagina =>
+        Resultado?.Evolucion == null
+            ? Enumerable.Empty<EvolucionPresupuesto>()
+            : Resultado.Evolucion
+                .Skip((PaginaActual - 1) * RegistrosPorPagina)
+                .Take(RegistrosPorPagina);
 
 
     // ==========================================================
@@ -776,6 +841,8 @@
 
     private async Task ConsultarAsync()
     {
+        PaginaActual = 1;
+        
         if (Cargando)
         {
             return;
@@ -797,6 +864,8 @@
             Resultado =
                 await NlqService.ProcesarAsync(
                     Pregunta.Trim(),
+                    PaginaActual,
+                    TamanioPagina,
                     CancellationToken.None);
 
             ConsultaRealizada = true;
@@ -822,6 +891,62 @@
         finally
         {
             Cargando = false;
+        }
+    }
+
+    //Paginación
+    private async Task CambiarPagina(int pagina)
+    {
+        if (Cargando)
+        {
+            return;
+        }
+
+        if (Resultado == null)
+        {
+            return;
+        }
+
+        if (pagina < 1 ||
+            pagina > Resultado.TotalPaginas)
+        {
+            return;
+        }
+
+        PaginaActual =
+            pagina;
+
+        Cargando = true;
+
+        try
+        {
+            Resultado =
+                await NlqService.ProcesarAsync(
+                    Pregunta.Trim(),
+                    PaginaActual,
+                    TamanioPagina,
+                    CancellationToken.None);
+        }
+        finally
+        {
+            Cargando = false;
+        }
+    }
+
+    //metodos de paginación
+    private void PaginaAnterior()
+    {
+        if (PaginaActual > 1)
+        {
+            PaginaActual--;
+        }
+    }
+
+    private void PaginaSiguiente()
+    {
+        if (PaginaActual < TotalPaginas)
+        {
+            PaginaActual++;
         }
     }
 
@@ -852,6 +977,8 @@
         Resultado = null;
 
         ConsultaRealizada = false;
+
+        PaginaActual = 1;
     }
 
 }

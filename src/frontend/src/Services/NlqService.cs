@@ -14,13 +14,11 @@ public sealed class NlqService
             mefService;
     }
 
-    // ============================================================
-    // PROCESAR CONSULTA
-    // ============================================================
-
     public async Task<NlqResponse>
         ProcesarAsync(
             string pregunta,
+            int pagina = 1,
+            int tamanioPagina = 20,
             CancellationToken cancellationToken = default)
     {
         if (
@@ -30,7 +28,10 @@ public sealed class NlqService
             return new NlqResponse
             {
                 Success = false,
-                Intent = "ConsultaVacia",
+
+                Intent =
+                    "ConsultaVacia",
+
                 Message =
                     "Escribe una consulta."
             };
@@ -43,19 +44,16 @@ public sealed class NlqService
         Console.WriteLine();
         Console.WriteLine(
             "==========================================");
-
         Console.WriteLine(
             "NLQ - CONSULTA");
-
         Console.WriteLine(
             $"Pregunta: {pregunta}");
-
         Console.WriteLine(
             $"Normalizada: {texto}");
-
+        Console.WriteLine(
+            $"Página solicitada: {pagina}");
         Console.WriteLine(
             "==========================================");
-
 
         // ========================================================
         // EVOLUCIÓN / PRESUPUESTO
@@ -72,14 +70,16 @@ public sealed class NlqService
             Console.WriteLine(
                 $"Entidad detectada: '{entidad}'");
 
-            var datos =
+            var resultado =
                 await _mefService
-                    .ObtenerEvolucionAsync(
+                    .ObtenerEvolucionPaginaAsync(
                         entidad,
+                        pagina,
+                        tamanioPagina,
                         cancellationToken);
 
             if (
-                datos.Count == 0)
+                resultado.Records.Count == 0)
             {
                 return new NlqResponse
                 {
@@ -94,7 +94,19 @@ public sealed class NlqService
                             ? "No se encontraron registros para la consulta en el período 2017-2021."
                             : $"No se encontraron registros para '{entidad}' en el período 2017-2021.",
 
-                    Evolucion = []
+                    Evolucion = [],
+
+                    TotalRegistros =
+                        resultado.Total,
+
+                    PaginaActual =
+                        resultado.Page,
+
+                    TamanioPagina =
+                        resultado.PageSize,
+
+                    TotalPaginas =
+                        resultado.TotalPages
                 };
             }
 
@@ -112,10 +124,21 @@ public sealed class NlqService
                         : $"Se encontraron registros presupuestarios para '{entidad}' entre 2017 y 2021.",
 
                 Evolucion =
-                    datos
+                    resultado.Records,
+
+                TotalRegistros =
+                    resultado.Total,
+
+                PaginaActual =
+                    resultado.Page,
+
+                TamanioPagina =
+                    resultado.PageSize,
+
+                TotalPaginas =
+                    resultado.TotalPages
             };
         }
-
 
         // ========================================================
         // PROYECTOS
@@ -124,18 +147,12 @@ public sealed class NlqService
         if (
             ContieneAlguno(
                 texto,
-
                 "proyecto",
                 "proyectos",
-
                 "producto",
-
                 "actividad",
-
                 "obra",
-
-                "meta"
-            ))
+                "meta"))
         {
             return new NlqResponse
             {
@@ -149,25 +166,18 @@ public sealed class NlqService
             };
         }
 
-
         // ========================================================
-        // CLASIFICACIÓN DEL GASTO
+        // CLASIFICACIÓN
         // ========================================================
 
         if (
             ContieneAlguno(
                 texto,
-
                 "generica",
-
                 "subgenerica",
-
                 "especifica",
-
                 "categoria de gasto",
-
-                "categoria del gasto"
-            ))
+                "categoria del gasto"))
         {
             return new NlqResponse
             {
@@ -181,7 +191,6 @@ public sealed class NlqService
             };
         }
 
-
         // ========================================================
         // FINANCIAMIENTO
         // ========================================================
@@ -189,15 +198,10 @@ public sealed class NlqService
         if (
             ContieneAlguno(
                 texto,
-
                 "fuente de financiamiento",
-
                 "fuente financiamiento",
-
                 "rubro",
-
-                "tipo de recurso"
-            ))
+                "tipo de recurso"))
         {
             return new NlqResponse
             {
@@ -211,7 +215,6 @@ public sealed class NlqService
             };
         }
 
-
         // ========================================================
         // CONTRATACIONES
         // ========================================================
@@ -219,21 +222,13 @@ public sealed class NlqService
         if (
             ContieneAlguno(
                 texto,
-
                 "contratacion",
-
                 "contrataciones",
-
                 "contrato",
-
                 "contratos",
-
                 "licitacion",
-
                 "licitaciones",
-
-                "oece"
-            ))
+                "oece"))
         {
             return new NlqResponse
             {
@@ -247,11 +242,6 @@ public sealed class NlqService
             };
         }
 
-
-        // ========================================================
-        // NO RECONOCIDO
-        // ========================================================
-
         return new NlqResponse
         {
             Success = false,
@@ -260,15 +250,12 @@ public sealed class NlqService
                 "NoReconocido",
 
             Message =
-                "No pude identificar la consulta. " +
-                "Prueba con presupuesto, PIA, PIM, " +
-                "devengado, girado o ejecución."
+                "No pude identificar la consulta. Prueba con presupuesto, PIA, PIM, devengado, girado o ejecución."
         };
     }
 
-
     // ============================================================
-    // DETECTAR CONSULTA DE PRESUPUESTO
+    // CONSULTA PRESUPUESTARIA
     // ============================================================
 
     private static bool
@@ -277,37 +264,19 @@ public sealed class NlqService
     {
         return ContieneAlguno(
             texto,
-
             "presupuesto",
-
             "presupuestario",
-
             "presupuestaria",
-
             "evolucion",
-
-            "evolucion del presupuesto",
-
             "pia",
-
             "pim",
-
             "certificado",
-
             "comprometido",
-
             "comprometido anual",
-
             "devengado",
-
             "girado",
-
-            "ejecucion",
-
-            "ejecución"
-        );
+            "ejecucion");
     }
-
 
     // ============================================================
     // EXTRAER ENTIDAD
@@ -343,7 +312,6 @@ public sealed class NlqService
                 "gobierno local"
             };
 
-
         foreach (
             var entidad
             in entidades)
@@ -357,13 +325,11 @@ public sealed class NlqService
             }
         }
 
-
         return "";
     }
 
-
     // ============================================================
-    // CONTIENE ALGUNO
+    // UTILS
     // ============================================================
 
     private static bool
@@ -377,11 +343,6 @@ public sealed class NlqService
                     valor,
                     StringComparison.OrdinalIgnoreCase));
     }
-
-
-    // ============================================================
-    // NORMALIZAR
-    // ============================================================
 
     private static string
         Normalizar(

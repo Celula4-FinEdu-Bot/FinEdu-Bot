@@ -24,4 +24,16 @@ public class NlqResponse
 
     [JsonPropertyName("contrataciones")]
     public List<Contratacion> Contrataciones { get; set; } = [];
+
+    // ============================================================
+    // PAGINACIÓN
+    // ============================================================
+
+    public int TotalRegistros { get; set; }
+
+    public int PaginaActual { get; set; } = 1;
+
+    public int TamanioPagina { get; set; } = 20;
+
+    public int TotalPaginas { get; set; } = 1;
 }
