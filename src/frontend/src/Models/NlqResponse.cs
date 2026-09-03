@@ -13,6 +13,12 @@ public class NlqResponse
     [JsonPropertyName("message")]
     public string? Message { get; set; }
 
+    [JsonPropertyName("output")]
+    public string? Output { get; set; }
+
+    [JsonPropertyName("risk")]
+    public string? Risk { get; set; }
+
     [JsonPropertyName("evolucion")]
     public List<EvolucionPresupuesto> Evolucion { get; set; } = [];
 
@@ -24,10 +30,6 @@ public class NlqResponse
 
     [JsonPropertyName("contrataciones")]
     public List<Contratacion> Contrataciones { get; set; } = [];
-
-    // ============================================================
-    // PAGINACIÓN
-    // ============================================================
 
     public int TotalRegistros { get; set; }
 
