@@ -1,0 +1,22 @@
+[
+  {
+    "success": true,
+    "intent": "EvolucionPresupuesto",
+    "message": "Se encontraron registros presupuestarios para 'Municipalidad de Lima' entre 2017 y 2021."
+  },
+  {
+    "success": true,
+    "intent": "Proyectos",
+    "message": "La consulta corresponde a información de proyectos, productos, actividades, obras o metas."
+  },
+  {
+    "success": true,
+    "intent": "Contrataciones",
+    "message": "Esta consulta corresponde al módulo de contrataciones/OECE."
+  },
+  {
+    "success": false,
+    "intent": "NoReconocido",
+    "message": "No pude identificar la consulta. Prueba con presupuesto, PIA, PIM, devengado, girado o ejecución."
+  }
+]
