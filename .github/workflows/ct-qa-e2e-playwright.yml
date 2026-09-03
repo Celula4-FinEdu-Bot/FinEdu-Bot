@@ -1,0 +1,84 @@
+name: CT - QA E2E (Playwright)
+
+# Se dispara DESPUÉS de que el CI del frontend termina (etapa de Continuous
+# Testing, no de Continuous Integration). No reemplaza ni modifica
+# frontend-ci.yml ni n8n-validate-ci.yml, solo se encadena a ellos.
+on:
+  workflow_run:
+    workflows: ["Frontend CI"] # debe coincidir con el "name:" real de frontend-ci.yml
+    types:
+      - completed
+  workflow_dispatch: {} # permite al QA correrlo manualmente mientras se afina
+
+jobs:
+  e2e-tests:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x" # ajustar a la versión real del csproj
+
+      - name: Publicar la app Blazor
+        run: |
+          dotnet restore
+          dotnet publish -c Release -o ./publish
+        # Ajustar el path si el .csproj de "src" no está en la raíz.
+
+      - name: Levantar la app en background
+        run: |
+          nohup dotnet ./publish/src.dll --urls=http://localhost:5000 > app.log 2>&1 &
+          echo "Esperando a que la app responda en localhost:5000..."
+          for i in $(seq 1 30); do
+            if curl -sSf http://localhost:5000 > /dev/null; then
+              echo "App arriba."
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias de Playwright
+        working-directory: src/ia-ops/tests/e2e
+        run: npm ci
+
+      - name: Instalar navegadores de Playwright
+        working-directory: src/ia-ops/tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Ejecutar pruebas E2E
+        working-directory: src/ia-ops/tests/e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:5000
+          CI: "true"
+        run: npx playwright test
+
+      - name: Subir log de la app (si algo falla al levantar)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+          retention-days: 7
+
+      - name: Publicar reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: src/ia-ops/tests/e2e/playwright-report/
+          retention-days: 14

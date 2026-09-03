@@ -1,0 +1,50 @@
+# QA E2E (Playwright) — capa CT
+
+Pruebas end-to-end para validar el comportamiento real de la app
+(Blazor Server + integración con la API del MEF), **después** de que
+el CI de cada módulo ya pasó. Esta carpeta vive dentro de `ia-ops/tests`
+para no invadir `src/frontend` ni `src/n8n-workflows`: solo consume la
+app publicada por HTTP, igual que un usuario final.
+
+## Qué NO es esto
+
+- No es una prueba unitaria de C# (eso lo cubre el dev con xUnit/NUnit
+  sobre `MefService` / `NlqService` directamente, dentro de su propio CI).
+- No reemplaza `test_prompt_injection.py` / `test_llm_outputs.py`, que
+  validan la capa de IA/prompts, no la UI.
+
+## Qué SÍ es
+
+- `smoke.spec.ts`: PoC / smoke test — la app responde y renderiza (Objetivo 1 del QA).
+- `mef-integration.spec.ts`: la UI efectivamente trae y muestra datos
+  reales provenientes de la API del MEF (Objetivo 2 del QA).
+
+## Cómo correr localmente
+
+```bash
+cd src/ia-ops/tests/e2e
+npm install
+npx playwright install --with-deps
+# con la app Blazor ya corriendo en http://localhost:5000
+npm test
+```
+
+## Cómo se automatiza
+
+El workflow `.github/workflows/ct-qa-e2e-playwright.yml` corre
+automáticamente cuando el workflow "Frontend CI" termina en verde
+(evento `workflow_run`), sin tocar los pipelines de CI existentes.
+También se puede disparar a mano desde la pestaña Actions
+(`workflow_dispatch`) mientras el QA ajusta selectores.
+
+## Pendientes de coordinación (no tocar código ajeno directamente)
+
+Los selectores actuales usan placeholder/texto/rol como fallback.
+Pedir al equipo de frontend, vía ticket o PR, que agregue atributos
+`data-testid` estables en:
+
+- el input de la consulta en lenguaje natural,
+- el botón de búsqueda,
+- el contenedor de resultados / mensajes de `NlqResponse`.
+
+Esto hace las pruebas más resistentes a cambios de copy o de estilos.
