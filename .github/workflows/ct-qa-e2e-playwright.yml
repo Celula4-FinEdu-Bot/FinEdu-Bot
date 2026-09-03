@@ -5,7 +5,7 @@ name: CT - QA E2E (Playwright)
 # frontend-ci.yml ni n8n-validate-ci.yml, solo se encadena a ellos.
 on:
   workflow_run:
-    workflows: ["Frontend CI"] # debe coincidir con el "name:" real de frontend-ci.yml
+    workflows: ["Frontend CI Pipeline"] # debe coincidir con el "name:" real de frontend-ci.yml
     types:
       - completed
   workflow_dispatch: {} # permite al QA correrlo manualmente mientras se afina
@@ -30,17 +30,18 @@ jobs:
           dotnet-version: "9.0.x" # ajustar a la versión real del csproj
 
       - name: Publicar la app Blazor
+        working-directory: src/frontend/src
         run: |
           dotnet restore
-          dotnet publish -c Release -o ./publish
-        # Ajustar el path si el .csproj de "src" no está en la raíz.
+          dotnet publish -c Release -o $GITHUB_WORKSPACE/publish
+        # Ajustar el path si el .csproj no está directamente en src/frontend/src.
 
       - name: Levantar la app en background
         run: |
-          nohup dotnet ./publish/src.dll --urls=http://localhost:5000 > app.log 2>&1 &
-          echo "Esperando a que la app responda en localhost:5000..."
+          nohup dotnet ./publish/src.dll --urls=http://localhost:5204 > app.log 2>&1 &
+          echo "Esperando a que la app responda en localhost:5204..."
           for i in $(seq 1 30); do
-            if curl -sSf http://localhost:5000 > /dev/null; then
+            if curl -sSf http://localhost:5204 > /dev/null; then
               echo "App arriba."
               break
             fi
@@ -63,7 +64,7 @@ jobs:
       - name: Ejecutar pruebas E2E
         working-directory: src/ia-ops/tests/e2e
         env:
-          PLAYWRIGHT_BASE_URL: http://localhost:5000
+          PLAYWRIGHT_BASE_URL: http://localhost:5204
           CI: "true"
         run: npx playwright test
 
