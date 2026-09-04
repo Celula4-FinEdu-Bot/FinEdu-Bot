@@ -8,7 +8,7 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "2cca5127-0fb8-4c74-8787-712657709c1b",
+      "id": "c0b08179-0bbf-45bb-a9bb-45b49d6de43c",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -22,12 +22,12 @@
       "parameters": {
         "promptType": "define",
         "text": "={{ $json.body.chatInput }}",
-        "needsFallback": true,
+        "hasOutputParser": true,
         "options": {
-          "systemMessage": "Eres un agente orquestador. Tienes acceso a dos herramientas: \"query_python_api\" (para consultar la API en Python) y \"knowledge_base\" (base de conocimiento RAG). Analiza cada solicitud y evalúa su nivel de riesgo. Al final de tu respuesta añade SIEMPRE una línea de clasificación exactamente con el formato: \"RISK: HIGH_RISK\" si la acción es sensible o requiere supervisión humana (pagos grandes, borrado de datos, accesos, información legal/financiera crítica), o \"RISK: SAFE\" si es una consulta segura."
+          "systemMessage": "Eres el agente orquestador de FinEdu-Bot.\n\nTu función es responder preguntas sobre información presupuestaria\ny documentación relacionada con el sector público peruano.\n\nDispones de una herramienta:\n\nknowledge_base:\nBase de conocimiento RAG que utiliza PostgreSQL con PGVector.\nÚsala para buscar información relevante de los documentos almacenados.\n\nREGLAS:\n\n1. Para preguntas relacionadas con presupuesto, PIA, PIM, devengado,\n   ejecución presupuestaria, entidades públicas, departamentos,\n   provincias, municipalidades y datos contenidos en la base MEF,\n   utiliza knowledge_base.\n\n2. Antes de responder una consulta de datos, intenta obtener contexto\n   utilizando knowledge_base.\n\n3. No inventes cifras, nombres de entidades ni información que no\n   aparezca en el contexto recuperado.\n\n4. Si la herramienta no encuentra información suficiente, indícalo\n   claramente.\n\n5. Conserva el contexto de la conversación utilizando la sesión\n   proporcionada por el Webhook.\n\n6. Devuelve SIEMPRE la respuesta siguiendo el esquema estructurado\n   configurado para el agente.\n\n7. La propiedad risk debe contener exactamente uno de estos valores:\n\nSAFE\nHIGH_RISK\n\n8. Para consultas normales de información pública utiliza:\n\nrisk = SAFE\n\n9. No agregues texto fuera de la respuesta estructurada."
         }
       },
-      "id": "f51aedd9-4b6e-40fa-beed-056106d2ed99",
+      "id": "68efb8e5-2b33-426f-98f7-fdb4b10b13f2",
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
@@ -38,68 +38,44 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-5-mini"
-        },
-        "builtInTools": {},
+        "model": "qwen/qwen3.8-27b",
         "options": {}
       },
-      "id": "b5b3529b-72ff-422a-8090-bb6b3699107d",
-      "name": "OpenAI Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
+      "id": "8cdde95c-5bf4-4599-a50e-698767096b16",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
       "position": [
         -1056,
-        288
+        304
       ],
       "credentials": {
-        "openAiApi": {
-          "id": "9zgJgSlLWxsrl0i6",
-          "name": "OpenAI account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "id": "965a0ad2-2290-4833-bdb2-58c1855fdaf1",
-      "name": "Google Gemini Chat Model (Fallback)",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1.1,
-      "position": [
-        -864,
-        288
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "4EtAse8QseQ3W4aI",
-          "name": "Google Gemini(PaLM) Api account"
+        "groqApi": {
+          "id": "QTqN3zgqkCvjgOwV",
+          "name": "Groq account"
         }
       }
     },
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $json.body.sessionId || 'sesion-unica' }}",
+        "sessionKey": "={{ $('Webhook').item.json.body.sessionId || 'sesion-unica' }}",
         "contextWindowLength": 10
       },
-      "id": "5b4bbc1e-a351-4ae7-8e79-77fdd600812d",
+      "id": "570235c4-7979-42f3-aea2-508d0272bd08",
       "name": "Window Buffer Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.4,
       "position": [
-        -672,
-        288
+        -640,
+        304
       ]
     },
     {
       "parameters": {
         "description": "Base de conocimiento interna (RAG). Úsala para responder preguntas sobre políticas, documentación y procedimientos internos."
       },
-      "id": "861f01dc-2091-4176-a2fb-2cc92c3836ef",
+      "id": "1bb3cbe6-96db-4200-85fa-f7e5065ed5bc",
       "name": "knowledge_base",
       "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
       "typeVersion": 1.1,
@@ -110,35 +86,30 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-5-mini"
-        },
-        "builtInTools": {},
+        "model": "qwen/qwen3.8-27b",
         "options": {}
       },
-      "id": "b1afb248-65fa-44d4-95bf-ab3f1a697336",
-      "name": "Vector Store QA Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
+      "id": "b5cca874-e746-4c49-9fcd-43ca0ae5dc6d",
+      "name": "Groq Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
       "position": [
-        -240,
+        -192,
         464
       ],
       "credentials": {
-        "openAiApi": {
-          "id": "9zgJgSlLWxsrl0i6",
-          "name": "OpenAI account"
+        "groqApi": {
+          "id": "QTqN3zgqkCvjgOwV",
+          "name": "Groq account"
         }
       }
     },
     {
       "parameters": {
-        "tableName": "mef_licitaciones",
+        "tableName": "hecho_presupuesto",
         "options": {}
       },
-      "id": "5bf64a0a-89a1-44b9-9add-303dbaefb521",
+      "id": "ddc41849-3771-49b6-a9ae-a903366aeff1",
       "name": "Postgres PGVector Store",
       "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
       "typeVersion": 1.3,
@@ -148,29 +119,77 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "7cpdNPoEGmYtZ6zL",
+          "id": "Xu01aQ6nPTyOf7l4",
           "name": "Postgres account"
         }
       }
     },
     {
-      "parameters": {
-        "options": {}
-      },
-      "id": "62557a58-e47e-417c-82f7-aced97c9c728",
-      "name": "Embeddings OpenAI",
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-      "typeVersion": 1.2,
+      "parameters": {},
+      "id": "ede98666-f197-42ab-8747-1f0727e6a53e",
+      "name": "Embeddings Google Gemini",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
       "position": [
-        -432,
+        -464,
         688
       ],
       "credentials": {
-        "openAiApi": {
-          "id": "9zgJgSlLWxsrl0i6",
-          "name": "OpenAI account"
+        "googlePalmApi": {
+          "id": "rvcI6YPn6xWm0hKc",
+          "name": "Google Gemini(PaLM) Api account"
         }
       }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"success\":{\"type\":\"boolean\"},\"intent\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"output\":{\"type\":\"string\"},\"risk\":{\"type\":\"string\",\"enum\":[\"SAFE\",\"HIGH_RISK\"]},\"evolucion\":{\"type\":\"array\"},\"presupuestos\":{\"type\":\"array\"},\"proyectos\":{\"type\":\"array\"},\"contrataciones\":{\"type\":\"array\"},\"totalRegistros\":{\"type\":\"integer\"},\"paginaActual\":{\"type\":\"integer\"},\"tamanioPagina\":{\"type\":\"integer\"},\"totalPaginas\":{\"type\":\"integer\"}},\"required\":[\"success\",\"intent\",\"message\",\"output\",\"risk\",\"evolucion\",\"presupuestos\",\"proyectos\",\"contrataciones\",\"totalRegistros\",\"paginaActual\",\"tamanioPagina\",\"totalPaginas\"]}",
+        "autoFix": true
+      },
+      "id": "89c8ecef-423d-4314-b606-afd19e99ae60",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -560,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {}
+      },
+      "id": "9ae4cd27-a164-4e8f-893f-5ac79b94c382",
+      "name": "Groq Chat Model (Parser)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        1072
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "QTqN3zgqkCvjgOwV",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "f5d43b55-3201-4fb8-8bf9-9ad324b15dd7",
+      "name": "Normalize Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -352,
+        48
+      ]
     },
     {
       "parameters": {
@@ -186,11 +205,11 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.output }}",
+                    "leftValue": "={{ $json.risk }}",
                     "rightValue": "HIGH_RISK",
                     "operator": {
                       "type": "string",
-                      "operation": "contains"
+                      "operation": "equals"
                     }
                   }
                 ],
@@ -206,7 +225,7 @@
           "renameFallbackOutput": "safe"
         }
       },
-      "id": "0526ca03-2afa-4ef6-9f63-b5b79a4405c4",
+      "id": "2e856d30-6f77-4707-a2bd-4dafdb824be4",
       "name": "Security Filter",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
@@ -223,10 +242,10 @@
           "value": "#auditoria",
           "mode": "name"
         },
-        "text": "=🚨 Alerta de alto riesgo (Human-in-the-loop) para sesión {{ $json.body.sessionId }}:\n\n{{ $json.output }}",
+        "text": "=🚨 Alerta de alto riesgo (Human-in-the-loop) para sesión {{ $('Webhook').item.json.body.sessionId }}:\n\n{{ $json.output }}",
         "otherOptions": {}
       },
-      "id": "316b536b-6ed9-4070-8529-661a67b247ff",
+      "id": "3c3728f2-719c-4f1f-95bf-8a925c3bc7d4",
       "name": "Slack Alert",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.5,
@@ -234,48 +253,46 @@
         0,
         0
       ],
-      "webhookId": "47561cb3-a873-4766-9dda-f865151f9682",
+      "webhookId": "6d23babe-a582-480a-b9d9-bf7cc496a7ca",
       "credentials": {
         "slackApi": {
-          "id": "QSC4F0wp4QiBDx0A",
-          "name": "Slack account"
+          "id": "EQrYvEBKFyP6u421",
+          "name": "Slack account 2"
         }
       }
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"output\": $json.output } }}",
+        "respondWith": "text",
+        "responseBody": "Tu consulta no pudo ser procesada por políticas de seguridad",
         "options": {}
       },
-      "id": "cc1f0b98-d5b8-417d-a1d2-8bf2ce2bcd51",
+      "id": "0224ca49-10e8-4a02-8337-dc20b02458bf",
+      "name": "Respond to Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: $json.success ?? false,\n  intent: $json.intent ?? \"NoReconocido\",\n  message: $json.message ?? \"\",\n  output: $json.output ?? \"\",\n  risk: $json.risk ?? \"SAFE\",\n  evolucion: $json.evolucion ?? [],\n  presupuestos: $json.presupuestos ?? [],\n  proyectos: $json.proyectos ?? [],\n  contrataciones: $json.contrataciones ?? [],\n  totalRegistros: $json.totalRegistros ?? 0,\n  paginaActual: $json.paginaActual ?? 1,\n  tamanioPagina: $json.tamanioPagina ?? 10,\n  totalPaginas: $json.totalPaginas ?? 1\n} }}",
+        "options": {}
+      },
+      "id": "daecc56e-8726-4782-bb7b-608dcc1d68b7",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
         0,
-        144
+        192
       ]
     }
   ],
-  "pinData": {
-    "Webhook": [
-      {
-        "json": {
-          "headers": {},
-          "query": {},
-          "params": {},
-          "body": {
-            "chatInput": "Necesito procesar un reembolso de 5000 USD para el cliente 123",
-            "sessionId": "session-abc-123"
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Webhook": {
       "main": [
@@ -292,31 +309,20 @@
       "main": [
         [
           {
-            "node": "Security Filter",
+            "node": "Normalize Output",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "OpenAI Chat Model": {
+    "Groq Chat Model": {
       "ai_languageModel": [
         [
           {
             "node": "AI Agent",
             "type": "ai_languageModel",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Google Gemini Chat Model (Fallback)": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_languageModel",
-            "index": 1
           }
         ]
       ]
@@ -343,7 +349,7 @@
         ]
       ]
     },
-    "Vector Store QA Model": {
+    "Groq Chat Model1": {
       "ai_languageModel": [
         [
           {
@@ -365,12 +371,45 @@
         ]
       ]
     },
-    "Embeddings OpenAI": {
+    "Embeddings Google Gemini": {
       "ai_embedding": [
         [
           {
             "node": "Postgres PGVector Store",
             "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model (Parser)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Output": {
+      "main": [
+        [
+          {
+            "node": "Security Filter",
+            "type": "main",
             "index": 0
           }
         ]
@@ -393,20 +432,30 @@
           }
         ]
       ]
+    },
+    "Slack Alert": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "e907a321-d771-412f-acbd-f95ab11cf744",
+  "versionId": "3bf3b9e5-676f-4b75-aba3-46f6724f117c",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "613882e83dd12c249271519bb0590f0d93d063a85ec604a1af25ab293691e623"
+    "instanceId": "691b4f409cff32aa21b9768fa87b1c56eee4e6894fce57b84488894d32beb119"
   },
   "nodeGroups": [],
-  "id": "hf35l0DBk3PaDqmV",
+  "id": "1Axh2PRHjhhk3q2D",
   "tags": []
 }

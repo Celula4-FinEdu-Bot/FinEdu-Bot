@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using src.Models;
 
@@ -12,18 +11,10 @@ public sealed class MefService
     private const string BaseUrl =
         "https://api.datosabiertos.mef.gob.pe/DatosAbiertos/v1/";
 
-    /*
-     * IMPORTANTE:
-     *
-     * Coloca aquí el Resource ID REAL del recurso
-     * comparativo de gastos 2017-2021 que estés utilizando.
-     *
-     * No reutilices el Resource ID 2022-2026.
-     */
     private const string ResourceId2017_2021 =
         "0e2469d8-5872-4bc2-a5bc-91ee01c99df8";
 
-    private const int Limit = 100;
+    private const int DefaultPageSize = 20;
 
     public MefService(HttpClient httpClient)
     {
@@ -34,7 +25,7 @@ public sealed class MefService
     }
 
     // ============================================================
-    // OBTENER EVOLUCIÓN 2017-2021
+    // CONSULTA NORMAL - COMPATIBILIDAD
     // ============================================================
 
     public async Task<List<EvolucionPresupuesto>>
@@ -42,37 +33,74 @@ public sealed class MefService
             string? filtro = null,
             CancellationToken cancellationToken = default)
     {
+        var pagina =
+            await ObtenerEvolucionPaginaAsync(
+                filtro,
+                1,
+                DefaultPageSize,
+                cancellationToken);
+
+        return pagina.Records;
+    }
+
+    // ============================================================
+    // CONSULTA PAGINADA
+    // ============================================================
+
+    public async Task<MefPageResult>
+        ObtenerEvolucionPaginaAsync(
+            string? filtro,
+            int pagina,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+    {
+        if (pagina < 1)
+        {
+            pagina = 1;
+        }
+
+        if (pageSize < 1)
+        {
+            pageSize = DefaultPageSize;
+        }
+
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
         filtro =
             LimpiarFiltro(filtro);
 
+        var offset =
+            (pagina - 1) * pageSize;
+
         Console.WriteLine();
-        Console.WriteLine("==========================================");
-        Console.WriteLine("MEF - CONSULTA 2017-2021");
+        Console.WriteLine(
+            "==========================================");
+        Console.WriteLine(
+            "MEF - CONSULTA 2017-2021");
         Console.WriteLine(
             $"Filtro: '{filtro}'");
         Console.WriteLine(
+            $"Página: {pagina}");
+        Console.WriteLine(
+            $"Tamaño página: {pageSize}");
+        Console.WriteLine(
+            $"Offset: {offset}");
+        Console.WriteLine(
             $"Resource ID: {ResourceId2017_2021}");
-        Console.WriteLine("==========================================");
-
-        if (
-            ResourceId2017_2021 ==
-            "COLOCA_AQUI_EL_RESOURCE_ID_2017_2021")
-        {
-            throw new InvalidOperationException(
-                "Debes colocar el Resource ID del dataset 2017-2021 en MefService.cs.");
-        }
+        Console.WriteLine(
+            "==========================================");
 
         try
         {
             var url =
                 $"{BaseUrl}datastore_search" +
                 $"?resource_id={Uri.EscapeDataString(ResourceId2017_2021)}" +
-                $"&limit={Limit}";
+                $"&limit={pageSize}" +
+                $"&offset={offset}";
 
-            /*
-             * El filtro se realiza mediante q solamente cuando
-             * existe una entidad explícita.
-             */
             if (!string.IsNullOrWhiteSpace(filtro))
             {
                 url +=
@@ -80,9 +108,12 @@ public sealed class MefService
             }
 
             Console.WriteLine();
-            Console.WriteLine("------------------------------------------");
-            Console.WriteLine("MEF - DATASTORE SEARCH");
-            Console.WriteLine("------------------------------------------");
+            Console.WriteLine(
+                "------------------------------------------");
+            Console.WriteLine(
+                "MEF - DATASTORE SEARCH");
+            Console.WriteLine(
+                "------------------------------------------");
 
             Console.WriteLine(url);
 
@@ -106,65 +137,228 @@ public sealed class MefService
 
                 Console.WriteLine(json);
 
-                return [];
+                return new MefPageResult
+                {
+                    Records = [],
+                    Total = 0,
+                    Page = pagina,
+                    PageSize = pageSize
+                };
             }
 
+            using var document =
+                JsonDocument.Parse(json);
+
+            var root =
+                document.RootElement;
+
             var registros =
-                ExtraerRegistros(json);
+                ExtraerRegistros(
+                    root);
+
+            var total =
+                ExtraerTotal(
+                    root,
+                    registros.Count,
+                    offset);
 
             Console.WriteLine(
                 $"Registros recibidos: {registros.Count}");
 
-            if (registros.Count == 0)
+            Console.WriteLine(
+                $"Total reportado por MEF: {total}");
+
+            if (registros.Count > 0)
             {
-                return [];
+                MostrarClavesPresupuesto(
+                    registros[0]);
+
+                MostrarValoresPresupuesto(
+                    registros[0]);
             }
 
-            /*
-             * Cada objeto recibido representa una fila
-             * del dataset 2017-2021.
-             *
-             * No existe una columna ANIO.
-             * Los cinco años están dentro del mismo registro.
-             */
             var resultados =
                 registros
                     .Select(MapearRegistro)
-                    .Where(x =>
-                        x is not null)
+                    .Where(x => x != null)
                     .Select(x => x!)
                     .ToList();
 
             Console.WriteLine(
                 $"Registros convertidos: {resultados.Count}");
 
-            return resultados;
+            return new MefPageResult
+            {
+                Records =
+                    resultados,
+
+                Total =
+                    total,
+
+                Page =
+                    pagina,
+
+                PageSize =
+                    pageSize
+            };
         }
         catch (OperationCanceledException)
         {
             Console.WriteLine(
                 "La consulta al MEF fue cancelada.");
 
-            return [];
+            throw;
         }
         catch (HttpRequestException ex)
         {
             Console.WriteLine(
-                $"Error HTTP del MEF: {ex.Message}");
+                $"Error HTTP MEF: {ex.Message}");
 
-            return [];
+            return new MefPageResult
+            {
+                Records = [],
+                Total = 0,
+                Page = pagina,
+                PageSize = pageSize
+            };
         }
         catch (Exception ex)
         {
             Console.WriteLine(
                 $"Error procesando MEF: {ex}");
 
-            return [];
+            return new MefPageResult
+            {
+                Records = [],
+                Total = 0,
+                Page = pagina,
+                PageSize = pageSize
+            };
         }
     }
 
     // ============================================================
-    // MAPEAR REGISTRO
+    // TOTAL
+    // ============================================================
+
+    private static int ExtraerTotal(
+        JsonElement root,
+        int cantidadPagina,
+        int offset)
+    {
+        if (
+            root.TryGetProperty(
+                "result",
+                out var result) &&
+            result.ValueKind ==
+                JsonValueKind.Object)
+        {
+            if (
+                result.TryGetProperty(
+                    "total",
+                    out var total) &&
+                total.ValueKind ==
+                    JsonValueKind.Number &&
+                total.TryGetInt32(
+                    out var totalInt))
+            {
+                return totalInt;
+            }
+        }
+
+        if (
+            root.TryGetProperty(
+                "result",
+                out result) &&
+            result.ValueKind ==
+                JsonValueKind.Object &&
+            result.TryGetProperty(
+                "count",
+                out var count) &&
+            count.ValueKind ==
+                JsonValueKind.Number &&
+            count.TryGetInt32(
+                out var countInt))
+        {
+            return offset + countInt;
+        }
+
+        return offset + cantidadPagina;
+    }
+
+    // ============================================================
+    // MOSTRAR CLAVES
+    // ============================================================
+
+    private static void MostrarClavesPresupuesto(
+        Dictionary<string, JsonElement> registro)
+    {
+        Console.WriteLine();
+        Console.WriteLine(
+            "------------------------------------------");
+        Console.WriteLine(
+            "MEF - CLAVES PRESUPUESTARIAS RECIBIDAS");
+        Console.WriteLine(
+            "------------------------------------------");
+
+        foreach (var clave in registro.Keys)
+        {
+            var nombre =
+                clave.ToUpperInvariant();
+
+            if (
+                nombre.Contains("PIA") ||
+                nombre.Contains("PIM") ||
+                nombre.Contains("DEVENGADO") ||
+                nombre.Contains("GIRADO") ||
+                nombre.Contains("CERTIFICADO") ||
+                nombre.Contains("COMPROMETIDO"))
+            {
+                Console.WriteLine(
+                    $"[{clave}]");
+            }
+        }
+    }
+
+    // ============================================================
+    // MOSTRAR VALORES CRUDOS
+    // ============================================================
+
+    private static void MostrarValoresPresupuesto(
+        Dictionary<string, JsonElement> registro)
+    {
+        Console.WriteLine();
+        Console.WriteLine(
+            "------------------------------------------");
+        Console.WriteLine(
+            "MEF - VALORES PRESUPUESTARIOS RECIBIDOS");
+        Console.WriteLine(
+            "------------------------------------------");
+
+        var claves =
+            registro.Keys
+                .Where(
+                    k =>
+                    k.Contains(
+                        "PIA",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    k.Contains(
+                        "PIM",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    k.Contains(
+                        "DEVENGADO",
+                        StringComparison.OrdinalIgnoreCase))
+                .Take(15);
+
+        foreach (var clave in claves)
+        {
+            Console.WriteLine(
+                $"{clave} = {registro[clave]}");
+        }
+    }
+
+    // ============================================================
+    // MAPEAR
     // ============================================================
 
     private static EvolucionPresupuesto?
@@ -217,11 +411,6 @@ public sealed class MefService
                     registro,
                     "PLIEGO_NOMBRE"),
 
-            SecEjecut =
-                ObtenerTexto(
-                    registro,
-                    "SEC_EJEC"),
-
             Ejecutora =
                 ObtenerTexto(
                     registro,
@@ -232,9 +421,10 @@ public sealed class MefService
                     registro,
                     "EJECUTORA_NOMBRE"),
 
-            // ====================================================
-            // UBICACIÓN
-            // ====================================================
+            SecEjecut =
+                ObtenerTexto(
+                    registro,
+                    "SEC_EJEC"),
 
             DepartamentoEjecutora =
                 ObtenerTexto(
@@ -273,8 +463,8 @@ public sealed class MefService
             ProgramaPpto =
                 ObtenerTexto(
                     registro,
-                    "PROGRAMA_PPT0",
-                    "PROGRAMA_PPTO"),
+                    "PROGRAMA_PPTO",
+                    "PROGRAMA_PPT0"),
 
             ProgramaPptoNombre =
                 ObtenerTexto(
@@ -312,7 +502,7 @@ public sealed class MefService
                     "ACTIVIDAD_ACCION_OBRA_NOMBRE"),
 
             // ====================================================
-            // CLASIFICACIÓN FUNCIONAL
+            // CLASIFICACIÓN
             // ====================================================
 
             Funcion =
@@ -475,37 +665,51 @@ public sealed class MefService
             Pia2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIA_2017"),
+                    "PIA_2017",
+                    "MONTO_PIA_2017",
+                    "PIA2017"),
 
             Pim2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIM_2017"),
+                    "PIM_2017",
+                    "MONTO_PIM_2017",
+                    "PIM2017"),
 
             Certificado2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_CERTIFICADO_2017"),
+                    "CERTIFICADO_2017",
+                    "MONTO_CERTIFICADO_2017",
+                    "CERTIFICADO2017"),
 
             ComprometidoAnual2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_ANUAL_2017"),
+                    "COMPROMETIDO_ANUAL_2017",
+                    "MONTO_COMPROMETIDO_ANUAL_2017",
+                    "COMPROMETIDOANUAL2017"),
 
             Comprometido2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_2017"),
+                    "COMPROMETIDO_2017",
+                    "MONTO_COMPROMETIDO_2017",
+                    "COMPROMETIDO2017"),
 
             Devengado2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_DEVENGADO_2017"),
+                    "DEVENGADO_2017",
+                    "MONTO_DEVENGADO_2017",
+                    "DEVENGADO2017"),
 
             Girado2017 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_GIRADO_2017"),
+                    "GIRADO_2017",
+                    "MONTO_GIRADO_2017",
+                    "GIRADO2017"),
 
             // ====================================================
             // 2018
@@ -514,37 +718,51 @@ public sealed class MefService
             Pia2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIA_2018"),
+                    "PIA_2018",
+                    "MONTO_PIA_2018",
+                    "PIA2018"),
 
             Pim2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIM_2018"),
+                    "PIM_2018",
+                    "MONTO_PIM_2018",
+                    "PIM2018"),
 
             Certificado2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_CERTIFICADO_2018"),
+                    "CERTIFICADO_2018",
+                    "MONTO_CERTIFICADO_2018",
+                    "CERTIFICADO2018"),
 
             ComprometidoAnual2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_ANUAL_2018"),
+                    "COMPROMETIDO_ANUAL_2018",
+                    "MONTO_COMPROMETIDO_ANUAL_2018",
+                    "COMPROMETIDOANUAL2018"),
 
             Comprometido2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_2018"),
+                    "COMPROMETIDO_2018",
+                    "MONTO_COMPROMETIDO_2018",
+                    "COMPROMETIDO2018"),
 
             Devengado2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_DEVENGADO_2018"),
+                    "DEVENGADO_2018",
+                    "MONTO_DEVENGADO_2018",
+                    "DEVENGADO2018"),
 
             Girado2018 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_GIRADO_2018"),
+                    "GIRADO_2018",
+                    "MONTO_GIRADO_2018",
+                    "GIRADO2018"),
 
             // ====================================================
             // 2019
@@ -553,37 +771,51 @@ public sealed class MefService
             Pia2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIA_2019"),
+                    "PIA_2019",
+                    "MONTO_PIA_2019",
+                    "PIA2019"),
 
             Pim2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIM_2019"),
+                    "PIM_2019",
+                    "MONTO_PIM_2019",
+                    "PIM2019"),
 
             Certificado2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_CERTIFICADO_2019"),
+                    "CERTIFICADO_2019",
+                    "MONTO_CERTIFICADO_2019",
+                    "CERTIFICADO2019"),
 
             ComprometidoAnual2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_ANUAL_2019"),
+                    "COMPROMETIDO_ANUAL_2019",
+                    "MONTO_COMPROMETIDO_ANUAL_2019",
+                    "COMPROMETIDOANUAL2019"),
 
             Comprometido2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_2019"),
+                    "COMPROMETIDO_2019",
+                    "MONTO_COMPROMETIDO_2019",
+                    "COMPROMETIDO2019"),
 
             Devengado2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_DEVENGADO_2019"),
+                    "DEVENGADO_2019",
+                    "MONTO_DEVENGADO_2019",
+                    "DEVENGADO2019"),
 
             Girado2019 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_GIRADO_2019"),
+                    "GIRADO_2019",
+                    "MONTO_GIRADO_2019",
+                    "GIRADO2019"),
 
             // ====================================================
             // 2020
@@ -592,37 +824,51 @@ public sealed class MefService
             Pia2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIA_2020"),
+                    "PIA_2020",
+                    "MONTO_PIA_2020",
+                    "PIA2020"),
 
             Pim2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIM_2020"),
+                    "PIM_2020",
+                    "MONTO_PIM_2020",
+                    "PIM2020"),
 
             Certificado2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_CERTIFICADO_2020"),
+                    "CERTIFICADO_2020",
+                    "MONTO_CERTIFICADO_2020",
+                    "CERTIFICADO2020"),
 
             ComprometidoAnual2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_ANUAL_2020"),
+                    "COMPROMETIDO_ANUAL_2020",
+                    "MONTO_COMPROMETIDO_ANUAL_2020",
+                    "COMPROMETIDOANUAL2020"),
 
             Comprometido2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_2020"),
+                    "COMPROMETIDO_2020",
+                    "MONTO_COMPROMETIDO_2020",
+                    "COMPROMETIDO2020"),
 
             Devengado2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_DEVENGADO_2020"),
+                    "DEVENGADO_2020",
+                    "MONTO_DEVENGADO_2020",
+                    "DEVENGADO2020"),
 
             Girado2020 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_GIRADO_2020"),
+                    "GIRADO_2020",
+                    "MONTO_GIRADO_2020",
+                    "GIRADO2020"),
 
             // ====================================================
             // 2021
@@ -631,56 +877,64 @@ public sealed class MefService
             Pia2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIA_2021"),
+                    "PIA_2021",
+                    "MONTO_PIA_2021",
+                    "PIA2021"),
 
             Pim2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_PIM_2021"),
+                    "PIM_2021",
+                    "MONTO_PIM_2021",
+                    "PIM2021"),
 
             Certificado2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_CERTIFICADO_2021"),
+                    "CERTIFICADO_2021",
+                    "MONTO_CERTIFICADO_2021",
+                    "CERTIFICADO2021"),
 
             ComprometidoAnual2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_ANUAL_2021"),
+                    "COMPROMETIDO_ANUAL_2021",
+                    "MONTO_COMPROMETIDO_ANUAL_2021",
+                    "COMPROMETIDOANUAL2021"),
 
             Comprometido2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_COMPROMETIDO_2021"),
+                    "COMPROMETIDO_2021",
+                    "MONTO_COMPROMETIDO_2021",
+                    "COMPROMETIDO2021"),
 
             Devengado2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_DEVENGADO_2021"),
+                    "DEVENGADO_2021",
+                    "MONTO_DEVENGADO_2021",
+                    "DEVENGADO2021"),
 
             Girado2021 =
                 ObtenerDecimal(
                     registro,
-                    "MONTO_GIRADO_2021")
+                    "GIRADO_2021",
+                    "MONTO_GIRADO_2021",
+                    "GIRADO2021")
         };
     }
 
     // ============================================================
-    // EXTRAER RECORDS
+    // EXTRAER REGISTROS
     // ============================================================
 
     private static List<Dictionary<string, JsonElement>>
         ExtraerRegistros(
-            string json)
+            JsonElement root)
     {
         var resultado =
             new List<Dictionary<string, JsonElement>>();
-
-        using var document =
-            JsonDocument.Parse(json);
-
-        var root =
-            document.RootElement;
 
         JsonElement records;
 
@@ -791,58 +1045,99 @@ public sealed class MefService
     // DECIMAL
     // ============================================================
 
-    private static decimal
-        ObtenerDecimal(
-            Dictionary<string, JsonElement> registro,
-            string campo)
+    private static decimal ObtenerDecimal(
+        Dictionary<string, JsonElement> registro,
+        params string[] campos)
     {
-        if (
-            !registro.TryGetValue(
-                campo,
-                out var valor))
-        {
-            return 0m;
-        }
-
-        if (
-            valor.ValueKind ==
-            JsonValueKind.Number)
+        foreach (var campo in campos)
         {
             if (
+                !registro.TryGetValue(
+                    campo,
+                    out var valor))
+            {
+                continue;
+            }
+
+            if (
+                valor.ValueKind ==
+                JsonValueKind.Null)
+            {
+                continue;
+            }
+
+            if (
+                valor.ValueKind ==
+                JsonValueKind.Number &&
                 valor.TryGetDecimal(
                     out var numero))
             {
                 return numero;
             }
-        }
 
-        var texto =
-            valor.ToString()?.Trim();
+            var texto =
+                valor.ToString()?.Trim();
 
-        if (
-            string.IsNullOrWhiteSpace(
-                texto))
-        {
-            return 0m;
-        }
+            if (
+                string.IsNullOrWhiteSpace(
+                    texto))
+            {
+                continue;
+            }
 
-        /*
-         * Los campos del diccionario del MEF son text.
-         * Permitimos tanto 12345.67 como 12,345.67.
-         */
-        texto =
-            texto.Replace(
-                ",",
-                "");
+            /*
+             * Caso 1:
+             *
+             * 12345.67
+             */
 
-        if (
-            decimal.TryParse(
-                texto,
-                NumberStyles.Any,
-                CultureInfo.InvariantCulture,
-                out var resultado))
-        {
-            return resultado;
+            if (
+                decimal.TryParse(
+                    texto,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out var resultado))
+            {
+                return resultado;
+            }
+
+            /*
+             * Caso 2:
+             *
+             * 12.345,67
+             */
+
+            if (
+                decimal.TryParse(
+                    texto,
+                    NumberStyles.Any,
+                    CultureInfo.GetCultureInfo(
+                        "es-PE"),
+                    out resultado))
+            {
+                return resultado;
+            }
+
+            /*
+             * Caso 3:
+             *
+             * 12,345.67
+             */
+
+            var normalizado =
+                texto.Replace(
+                    ",",
+                    "");
+
+            if (
+                decimal.TryParse(
+                    normalizado,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out resultado))
+            {
+                return resultado;
+            }
         }
 
         return 0m;
@@ -871,6 +1166,8 @@ public sealed class MefService
 
         return int.TryParse(
             texto,
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
             out var resultado)
             ? resultado
             : null;
@@ -884,13 +1181,43 @@ public sealed class MefService
         LimpiarFiltro(
             string? filtro)
     {
-        if (
+        return
             string.IsNullOrWhiteSpace(
-                filtro))
-        {
-            return "";
-        }
+                filtro)
+                ? ""
+                : filtro.Trim();
+    }
+}
 
-        return filtro.Trim();
+
+// =================================================================
+// RESULTADO PAGINADO
+// =================================================================
+
+public sealed class MefPageResult
+{
+    public List<EvolucionPresupuesto> Records { get; set; } = [];
+
+    public int Total { get; set; }
+
+    public int Page { get; set; }
+
+    public int PageSize { get; set; }
+
+    public int TotalPages
+    {
+        get
+        {
+            if (PageSize <= 0)
+            {
+                return 1;
+            }
+
+            return Math.Max(
+                1,
+                (int)Math.Ceiling(
+                    (double)Total /
+                    PageSize));
+        }
     }
 }

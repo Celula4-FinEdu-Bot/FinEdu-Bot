@@ -31,7 +31,7 @@
             </h1>
 
             <p class="subtitle">
-                Consulta información presupuestaria del MEF
+                Consulta información presupuestaria del Ministerio de economía y Finanzas (MEF)
                 utilizando lenguaje natural.
             </p>
 
@@ -227,10 +227,8 @@
             <!-- MENSAJE -->
             <!-- ============================================== -->
 
-            @if (!string.IsNullOrWhiteSpace(
-                Resultado.Message))
+            @if (!string.IsNullOrWhiteSpace(Resultado.Message))
             {
-
                 <div class="message-box @(Resultado.Success
                     ? "message-success"
                     : "message-warning")">
@@ -238,7 +236,13 @@
                     @Resultado.Message
 
                 </div>
+            }
 
+            @if (!string.IsNullOrWhiteSpace(Resultado.Output))
+            {
+                <div class="message-box message-success">
+                    @Resultado.Output
+                </div>
             }
 
 
@@ -273,7 +277,7 @@
                         </div>
 
                         <span class="result-count">
-                            @Resultado.Evolucion.Count registro(s)
+                            @Resultado.TotalRegistros registro(s)
                         </span>
 
                     </div>
@@ -332,7 +336,7 @@
 
                                 @foreach (
                                     var registro
-                                    in Resultado.Evolucion)
+                                    in RegistrosPagina)
                                 {
                                     <!-- ================================= -->
                                     <!-- 2017 -->
@@ -684,6 +688,50 @@
 
                         </table>
 
+                        @* paginacion *@
+                        @if (TotalPaginas > 1)
+                        {
+                            <div class="pagination-container">
+
+                                <div class="pagination-info">
+                                    Mostrando
+                                    @(((PaginaActual - 1) * RegistrosPorPagina) + 1)
+                                    -
+                                    @(Math.Min(
+                                        PaginaActual * RegistrosPorPagina,
+                                        Resultado?.Evolucion?.Count ?? 0))
+                                    de
+                                    @(Resultado?.Evolucion?.Count ?? 0)
+                                    registros
+                                </div>
+
+                                <div class="pagination-buttons">
+
+                                    <button type="button"
+                                            class="pagination-button"
+                                            @onclick="PaginaAnterior"
+                                            disabled="@(PaginaActual == 1)">
+                                        Anterior
+                                    </button>
+
+                                    <span class="pagination-page">
+                                        Página @PaginaActual de @TotalPaginas
+                                    </span>
+
+                                    <button type="button"
+                                            class="pagination-button"
+                                            @onclick="PaginaSiguiente"
+                                            disabled="@(PaginaActual >= TotalPaginas)">
+                                        Siguiente
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        }
+
+
+
                     </div>
 
                 </div>
@@ -762,12 +810,43 @@
 
     private string Pregunta =
         "muestrame el registro del año 2017-2021";
+    
+
+    private string SessionId =
+    Guid.NewGuid().ToString("N");
 
     private NlqResponse? Resultado;
 
     private bool Cargando;
+  
+    private const int TamanioPagina = 10;
 
     private bool ConsultaRealizada;
+
+    private int PaginaActual { get; set; } = 1;
+
+    // Cantidad de registros MEF que se muestran por página.
+    private const int RegistrosPorPagina = 10;
+
+    private int TotalPaginas =>
+        Resultado?.Evolucion is { Count: > 0 }
+            ? (int)Math.Ceiling(
+                Resultado.Evolucion.Count /
+                (double)RegistrosPorPagina)
+            : 0;
+
+    private IEnumerable<EvolucionPresupuesto> RegistrosPagina
+    {
+        get
+        {
+            if (Resultado?.Evolucion == null)
+                return Enumerable.Empty<EvolucionPresupuesto>();
+
+            return Resultado.Evolucion
+                .Skip((PaginaActual - 1) * RegistrosPorPagina)
+                .Take(RegistrosPorPagina);
+        }
+    }
 
 
     // ==========================================================
@@ -776,15 +855,8 @@
 
     private async Task ConsultarAsync()
     {
-        if (Cargando)
-        {
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(Pregunta))
-        {
             return;
-        }
 
         Cargando = true;
 
@@ -792,30 +864,18 @@
 
         Resultado = null;
 
+        // Cada nueva consulta comienza nuevamente
+        // desde la primera página.
+        PaginaActual = 1;
+
         try
         {
-            Resultado =
-                await NlqService.ProcesarAsync(
-                    Pregunta.Trim(),
-                    CancellationToken.None);
-
-            ConsultaRealizada = true;
-        }
-        catch (Exception ex)
-        {
-            Resultado =
-                new NlqResponse
-                {
-                    Success = false,
-
-                    Intent =
-                        "Error",
-
-                    Message =
-                        $"No fue posible procesar la consulta: {ex.Message}",
-
-                    Evolucion = []
-                };
+            Resultado = await NlqService.ProcesarAsync(
+                        Pregunta.Trim(),
+                        PaginaActual,
+                        TamanioPagina,
+                        SessionId,
+                        CancellationToken.None);
 
             ConsultaRealizada = true;
         }
@@ -825,15 +885,76 @@
         }
     }
 
+    //Paginación
+    private async Task CambiarPagina(int pagina)
+    {
+        if (Cargando)
+        {
+            return;
+        }
+
+        if (Resultado == null)
+        {
+            return;
+        }
+
+        if (pagina < 1 ||
+            pagina > Resultado.TotalPaginas)
+        {
+            return;
+        }
+
+        PaginaActual =
+            pagina;
+
+        Cargando = true;
+
+        try
+        {
+            @* se agrego sessionId *@
+            Resultado =
+                await NlqService.ProcesarAsync(
+                    Pregunta.Trim(),
+                    PaginaActual,
+                    TamanioPagina,                    
+                    SessionId,
+                    CancellationToken.None);
+        }
+        finally
+        {
+            Cargando = false;
+        }
+    }
+
+    //metodos de paginación
+    private void PaginaAnterior()
+    {
+        if (PaginaActual > 1)
+        {
+            PaginaActual--;
+        }
+    }
+
+    private void PaginaSiguiente()
+    {
+        if (PaginaActual < TotalPaginas)
+        {
+            PaginaActual++;
+        }
+    }
+
+    // =========================================================
+    // CONSULTA
+    // =========================================================
+
 
     // ==========================================================
     // ENTER
     // ==========================================================
 
-    private async Task HandleKeyDown(
-        KeyboardEventArgs e)
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && !Cargando)
         {
             await ConsultarAsync();
         }
@@ -844,14 +965,13 @@
     // USAR EJEMPLO
     // ==========================================================
 
-    private void UsarEjemplo(
-        string texto)
+    private async Task UsarEjemplo(string ejemplo)
     {
-        Pregunta = texto;
+        Pregunta = ejemplo;
 
-        Resultado = null;
-
-        ConsultaRealizada = false;
+        await ConsultarAsync();
     }
+
+    
 
 }
