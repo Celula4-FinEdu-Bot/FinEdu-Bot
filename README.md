@@ -98,7 +98,7 @@ Abrir el navegador en `http://localhost:3000`. Debe mostrarse la pantalla princi
 
 El recorrido de una consulta a través del sistema, de punta a punta, es el siguiente:
 
-1. **Frontend (usuario):** ingresa la pregunta en `index.html`, que se envía vía HTTP POST con `chatInput` y `sessionId`.
+1. **Frontend (usuario):** ingresa la pregunta en `home.razor`, que se envía vía HTTP POST con `chatInput` y `sessionId`.
 2. **Backend (Node.js/Express):** recibe la petición, procesa el JSON y lo reenvía de forma segura al orquestador mediante una llamada al webhook.
 3. **Orquestador (n8n):** recibe los datos y asigna la sesión en memoria (Window Buffer Memory).
 4. **AI Agent + LLM:** analiza la pregunta y decide si debe usar la herramienta `knowledge_base` (búsqueda semántica).
@@ -109,12 +109,14 @@ El recorrido de una consulta a través del sistema, de punta a punta, es el sigu
 ## Stack tecnológico
 
 **Backend & IA**
+
 - Orquestación e IA: n8n, OpenAI API, Google Gemini API
 - Backend e integración: Node.js, TypeScript, Express.js
 - Base de datos y almacenamiento vectorial: PostgreSQL, PGVector
 - Infraestructura y despliegue: Render, Docker Desktop, WSL 2
 
 **Frontend**
+
 - Orquestación e IA: NLQ (Natural Language Query)
 - Patrón de arquitectura: arquitectura por capas, Service Layer, microservicios, microfrontend
 - Desarrollo e integración: .NET 9, Blazor Web App, Razor, JavaScript, HttpClient
@@ -136,11 +138,11 @@ Este proyecto sigue reglas estrictas de control de versiones, alineadas al manif
 - **El botón de Merge se bloquea automáticamente** si el pipeline falla en cualquiera de los puntos anteriores.
 - **Cada commit y PR debe estar vinculado a un Issue** del tablero del proyecto (GitHub Projects).
 
-> **Nota para colaboradores:** los workflows marcados como *required check* en Branch Protection no filtran por `paths` en su disparador `pull_request` (sí lo hacen en `push`). Si un PR no toca la carpeta relacionada con un workflow requerido y ese workflow tuviera un filtro de `paths` en `pull_request`, GitHub nunca dispara el check y el PR queda bloqueado indefinidamente en `Expected — Waiting for status`. Si agregas un nuevo workflow requerido, respeta este mismo criterio.
+> **Nota para colaboradores:** los workflows marcados como _required check_ en Branch Protection no filtran por `paths` en su disparador `pull_request` (sí lo hacen en `push`). Si un PR no toca la carpeta relacionada con un workflow requerido y ese workflow tuviera un filtro de `paths` en `pull_request`, GitHub nunca dispara el check y el PR queda bloqueado indefinidamente en `Expected — Waiting for status`. Si agregas un nuevo workflow requerido, respeta este mismo criterio.
 
 ## Seguridad
 
-- **Análisis estático (SAST):** CodeQL revisa automáticamente el código en busca de vulnerabilidades conocidas en cada PR y push a `main`. Los resultados quedan visibles en la pestaña *Security → Code scanning* del repositorio.
+- **Análisis estático (SAST):** CodeQL revisa automáticamente el código en busca de vulnerabilidades conocidas en cada PR y push a `main`. Los resultados quedan visibles en la pestaña _Security → Code scanning_ del repositorio.
 - **Checklist de PR:** `PULL_REQUEST_TEMPLATE.md` precarga una lista de verificación mínima de estructura y seguridad que debe completarse antes de solicitar revisión.
 
 ## Observabilidad en producción
@@ -157,16 +159,15 @@ Esto es crítico porque el bot reporta información sobre gasto público real; u
 
 ## Equipo (Célula)
 
-| Rol                          | Responsable       | Rama de trabajo      |
-| ----------------------------- | ------------------ | --------------------- |
-| Arquitecto de software        | Samantha Lezma      | `Arquitectura-Lezma`  |
-| MLOps / DevSecOps Leader      | Kevin Pasion        | `DevSecOps-Pasion`    |
-| Backend & IA Engineers        | Diogo Canchari       | `Backend-Canchari`    |
-| Frontend & Data Interaction   | Yitzak Zamudio       | `FrontEnd-Zamudio`    |
-| QA & Prompt Engineer          | Alexander Marino     | `QA-Marino`           |
-| Scrum Master                  | Alexandro Medina     | `ScrumMaster-Medina`  |
+| Rol                         | Responsable      | Rama de trabajo      |
+| --------------------------- | ---------------- | -------------------- |
+| Arquitecto de software      | Samantha Lezma   | `Arquitectura-Lezma` |
+| MLOps / DevSecOps Leader    | Kevin Pasion     | `DevSecOps-Pasion`   |
+| Backend & IA Engineers      | Diogo Canchari   | `Backend-Canchari`   |
+| Frontend & Data Interaction | Yitzak Zamudio   | `FrontEnd-Zamudio`   |
+| QA & Prompt Engineer        | Alexander Marino | `QA-Marino`          |
+| Scrum Master                | Alexandro Medina | `ScrumMaster-Medina` |
 
 ## Licencia
 
 _Pendiente de definir por la célula._
-
