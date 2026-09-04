@@ -1,49 +1,55 @@
-name: CT - QA E2E (Playwright)
+name: QA E2E (Playwright)
 
-# Se dispara DESPUÉS de que el CI del frontend termina (etapa de Continuous
-# Testing, no de Continuous Integration). No reemplaza ni modifica
-# frontend-ci.yml ni n8n-validate-ci.yml, solo se encadena a ellos.
+# Ya no depende del CI del frontend ni se encadena a él. Corre de forma
+# independiente en cada PR, como un check más (igual que SAST, SCA, etc.).
 on:
-  workflow_run:
-    workflows: ["Frontend CI Pipeline"] # debe coincidir con el "name:" real de frontend-ci.yml
-    types:
-      - completed
-  workflow_dispatch: {} # permite al QA correrlo manualmente mientras se afina
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   e2e-tests:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    name: e2e-tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+
+      - name: Verificar que la carpeta de pruebas E2E existe
+        run: |
+          if [ ! -d "src/ia-ops/tests/e2e" ]; then
+            echo "::error::La carpeta src/ia-ops/tests/e2e no existe en este commit/rama."
+            echo "Verifica que fue commiteada y que estás probando la rama correcta."
+            exit 1
+          fi
+          echo "Carpeta de pruebas E2E encontrada."
 
       - name: Configurar .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "9.0.x" # ajustar a la versión real del csproj
+          dotnet-version: "9.0.x"
 
       - name: Publicar la app Blazor
         working-directory: src/frontend/src
         run: |
           dotnet restore
-          dotnet publish -c Release -o $GITHUB_WORKSPACE/publish
-        # Ajustar el path si el .csproj no está directamente en src/frontend/src.
+          dotnet publish -c Release -o "$GITHUB_WORKSPACE/publish"
 
       - name: Levantar la app en background
         run: |
-          nohup dotnet ./publish/src.dll --urls=http://localhost:5204 > app.log 2>&1 &
+          nohup dotnet "$GITHUB_WORKSPACE/publish/src.dll" --urls=http://localhost:5204 > app.log 2>&1 &
           echo "Esperando a que la app responda en localhost:5204..."
           for i in $(seq 1 30); do
             if curl -sSf http://localhost:5204 > /dev/null; then
               echo "App arriba."
               break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::La app no respondió a tiempo."
+              cat app.log
+              exit 1
             fi
             sleep 2
           done
@@ -75,6 +81,7 @@ jobs:
           name: app-log
           path: app.log
           retention-days: 7
+          if-no-files-found: warn
 
       - name: Publicar reporte de Playwright
         if: always()
@@ -83,3 +90,4 @@ jobs:
           name: playwright-report
           path: src/ia-ops/tests/e2e/playwright-report/
           retention-days: 14
+          if-no-files-found: warn
