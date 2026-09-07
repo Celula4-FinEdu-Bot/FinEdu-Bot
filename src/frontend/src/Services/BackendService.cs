@@ -22,6 +22,9 @@ public sealed class BackendService
         string sessionId,
         CancellationToken cancellationToken = default)
     {
+        /// <summary>
+        /// se cambio por esta configuración para que se usara desde el appsetting tanto en local comoo desplegado en render.
+        /// </summary>
         var baseUrl = _configuration["Backend:BaseUrl"];
 
         if (string.IsNullOrWhiteSpace(baseUrl))
