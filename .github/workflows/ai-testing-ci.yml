@@ -51,8 +51,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r src/ia-ops/requirements.txt
 
-      - name: Instalar navegadores de Playwright
+      - name: Verificar e instalar Playwright
         run: |
+          python -m pip install playwright
           python -m playwright install --with-deps chromium
 
       - name: Restaurar dependencias .NET
