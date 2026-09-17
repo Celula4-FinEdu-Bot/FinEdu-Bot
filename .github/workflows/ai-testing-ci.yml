@@ -107,7 +107,7 @@ jobs:
 
       - name: Configurar Python
         if: steps.existe.outputs.resultado == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
