@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verificar que la carpeta de pruebas E2E existe
         run: |

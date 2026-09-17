@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout del codigo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verificar si existe el modulo de IA Ops
         id: existe
