@@ -76,7 +76,7 @@ jobs:
 
       - name: Subir log de la app (si algo falla al levantar)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-log
           path: app.log
@@ -85,7 +85,7 @@ jobs:
 
       - name: Publicar reporte de Playwright
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: src/ia-ops/tests/e2e/playwright-report/
