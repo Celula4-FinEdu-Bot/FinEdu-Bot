@@ -19,37 +19,42 @@
           ]
         }
       },
-      "id": "102c793d-577a-4fd3-b749-801029a96366",
+      "id": "67f98f40-8b95-4d1f-a0cd-a72368bf12e1",
       "name": "When Executed by Another Workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [
-        0,
-        0
-      ]
+      "position": [-144, -96]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n    e.id AS entidad_id,\n    e.ejecutora_nombre AS entidad,\n    e.departamento_ejecutora_nombre AS departamento,\n    e.provincia_ejecutora_nombre AS provincia,\n    e.distrito_ejecutora_nombre AS distrito,\n    h.anio,\n    SUM(COALESCE(h.pia, 0)) AS pia,\n    SUM(COALESCE(h.pim, 0)) AS pim,\n    SUM(COALESCE(h.certificado, 0)) AS certificado,\n    SUM(COALESCE(h.comprometido_anual, 0)) AS comprometido_anual,\n    SUM(COALESCE(h.comprometido, 0)) AS comprometido,\n    SUM(COALESCE(h.devengado, 0)) AS devengado,\n    SUM(COALESCE(h.girado, 0)) AS girado\nFROM hecho_presupuesto h\nINNER JOIN dim_entidad e\n    ON e.id = h.entidad_id\nWHERE\n    e.ejecutora_nombre ILIKE '%' || $1 || '%'\n    AND h.anio BETWEEN $2 AND $3\nGROUP BY\n    e.id,\n    e.ejecutora_nombre,\n    e.departamento_ejecutora_nombre,\n    e.provincia_ejecutora_nombre,\n    e.distrito_ejecutora_nombre,\n    h.anio\nORDER BY e.id, h.anio;",
+        "query": "SELECT\n    e.ejecutora_nombre AS entidad,\n    e.departamento_ejecutora_nombre AS departamento,\n    e.provincia_ejecutora_nombre AS provincia,\n    e.distrito_ejecutora_nombre AS distrito,\n    hp.anio,\n\n    ROUND(SUM(COALESCE(hp.pia, 0)), 2) AS pia,\n    ROUND(SUM(COALESCE(hp.pim, 0)), 2) AS pim,\n    ROUND(SUM(COALESCE(hp.certificado, 0)), 2) AS certificado,\n    ROUND(SUM(COALESCE(hp.comprometido_anual, 0)), 2) AS comprometido_anual,\n    ROUND(SUM(COALESCE(hp.comprometido, 0)), 2) AS comprometido,\n    ROUND(SUM(COALESCE(hp.devengado, 0)), 2) AS devengado,\n    ROUND(SUM(COALESCE(hp.girado, 0)), 2) AS girado\n\nFROM hecho_presupuesto hp\n\nINNER JOIN dim_entidad e\n    ON e.id = hp.entidad_id\n\nWHERE\n    UPPER(TRIM(e.ejecutora_nombre))\n        = UPPER(TRIM($1))\n\n    AND hp.anio BETWEEN $2 AND $3\n\nGROUP BY\n    e.ejecutora_nombre,\n    e.departamento_ejecutora_nombre,\n    e.provincia_ejecutora_nombre,\n    e.distrito_ejecutora_nombre,\n    hp.anio\n\nORDER BY hp.anio;",
         "options": {
           "queryReplacement": "={{ $json.entidad }},={{ $json.anioInicio }},={{ $json.anioFin }}"
         }
       },
-      "id": "b5cb08cb-efda-40cf-9318-fb9be2c7c688",
+      "id": "9e645914-fb67-4fdc-9804-e266a463f5dd",
       "name": "Consulta Evolucion",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
-      "position": [
-        224,
-        0
-      ],
+      "position": [80, -96],
       "credentials": {
         "postgres": {
-          "id": "I7gbMKqHXsUfvDPz",
+          "id": "JEI91kyfMHzcxS28",
           "name": "Postgres account"
         }
-      }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const filas = $input.all()\n  .map(i => i.json)\n  .filter(row => Object.keys(row).length > 0);\n\nreturn [{ json: { totalFilas: filas.length, filas } }];"
+      },
+      "id": "f0f0f0f0-2222-4e11-9a11-666666666666",
+      "name": "Formatear Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [304, -96]
     }
   ],
   "pinData": {},
@@ -64,6 +69,17 @@
           }
         ]
       ]
+    },
+    "Consulta Evolucion": {
+      "main": [
+        [
+          {
+            "node": "Formatear Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -71,11 +87,12 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "489c7b68-1195-471b-a060-83308620c16a",
+  "versionId": "5dce655f-33a6-4026-905b-4ce0516e1a59",
   "meta": {
-    "instanceId": "6289dccf99b97d75fe3bc260da322ee7e5286620b35ac2c234a2adac2e58e0c4"
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40c0ecc9a1cceabb88217530c9a72acb8c69b01b9314946b168dbc176aa58d49"
   },
   "nodeGroups": [],
-  "id": "BibDONx4HIe5z9KK",
+  "id": "d5LFCboVQQsrTzdF",
   "tags": []
 }
