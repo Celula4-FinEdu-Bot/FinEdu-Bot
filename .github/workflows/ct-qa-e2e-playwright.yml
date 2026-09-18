@@ -2,10 +2,23 @@ name: QA E2E (Playwright)
 
 # Ya no depende del CI del frontend ni se encadena a él. Corre de forma
 # independiente en cada PR, como un check más (igual que SAST, SCA, etc.).
+#
+# NOTA DevSecOps (T2/T6): este workflow publica y ejecuta la app Blazor
+# de forma local, pero la app llama a BACKEND_API_URL, que a su vez
+# invoca el webhook real de n8n Cloud. Si BACKEND_API_URL apunta al
+# backend de produccion, cada PR consume cuota real de Groq/Gemini y
+# puede disparar la alerta de #auditoria en Slack. Se reporta como
+# hallazgo para que Backend/Frontend definan un entorno de pruebas
+# aislado (staging) en un sprint posterior. No se modifica aqui porque
+# escapa al alcance de DevSecOps sobre codigo de frontend/backend.
+
 on:
   pull_request:
     branches: [main]
   workflow_dispatch: {}
+
+permissions:
+  contents: read
 
 jobs:
   e2e-tests:
@@ -25,6 +38,18 @@ jobs:
             exit 1
           fi
           echo "Carpeta de pruebas E2E encontrada."
+
+      - name: Detectar credenciales embebidas en la suite E2E
+        run: |
+          echo "Buscando posibles credenciales hardcodeadas en src/ia-ops/tests/e2e..."
+          PATRONES='(gsk_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{30,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})'
+          if grep -rEn "$PATRONES" src/ia-ops/tests/e2e/ 2>/dev/null; then
+            echo ""
+            echo "::error::Se detectaron credenciales embebidas en src/ia-ops/tests/e2e."
+            echo "Mover el valor a GitHub Secrets y referenciarlo por variable de entorno."
+            exit 1
+          fi
+          echo "Sin credenciales embebidas."
 
       - name: Configurar .NET
         uses: actions/setup-dotnet@v4
