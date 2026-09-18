@@ -21,10 +21,10 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json.body.chatInput }}",
+        "text": "={{ $json.body?.chatInput ?? $json.chatInput }}",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "Eres el agente orquestador de FinEdu-Bot.\n\nTu función es responder preguntas sobre información presupuestaria\ny documentación relacionada con el sector público peruano.\n\nDispones de una herramienta:\n\nknowledge_base:\nBase de conocimiento RAG que utiliza PostgreSQL con PGVector.\nÚsala para buscar información relevante de los documentos almacenados.\n\nREGLAS:\n\n1. Para preguntas relacionadas con presupuesto, PIA, PIM, devengado,\n   ejecución presupuestaria, entidades públicas, departamentos,\n   provincias, municipalidades y datos contenidos en la base MEF,\n   utiliza knowledge_base.\n\n2. Antes de responder una consulta de datos, intenta obtener contexto\n   utilizando knowledge_base.\n\n3. No inventes cifras, nombres de entidades ni información que no\n   aparezca en el contexto recuperado.\n\n4. Si la herramienta no encuentra información suficiente, indícalo\n   claramente.\n\n5. Conserva el contexto de la conversación utilizando la sesión\n   proporcionada por el Webhook.\n\n6. Devuelve SIEMPRE la respuesta siguiendo el esquema estructurado\n   configurado para el agente.\n\n7. La propiedad risk debe contener exactamente uno de estos valores:\n\nSAFE\nHIGH_RISK\n\n8. Para consultas normales de información pública utiliza:\n\nrisk = SAFE\n\n9. No agregues texto fuera de la respuesta estructurada.\n\n10. Las consultas de evolución, histórico, tendencia o comparación\npor años deben utilizar datos estructurados de PostgreSQL.\n\n11. Nunca mezcles entidades diferentes en una misma evolución,\nsalvo que el usuario solicite explícitamente una comparación.\n\n12. Cuando exista una entidad concreta, identifica primero su\nentidad_id y utiliza ese identificador como filtro principal.\n\n13. Todos los registros de una evolución deben pertenecer a la misma\nentidad_id.\n\n14. Para una evolución agrupa los datos por entidad_id y anio.\n\n15. Calcula mediante suma únicamente:\nPIA, PIM, certificado, comprometido_anual, comprometido,\ndevengado y girado.\n\n16. No inventes años que no tengan registros.\n\n17. Si un año no tiene registros, indícalo como \"sin registro disponible\".\n\n18. No utilices similitud semántica de PGVector como criterio final\npara determinar qué registros pertenecen a una evolución histórica.\n\n19. PGVector se utiliza principalmente para recuperación contextual\ny consultas descriptivas.\n\n20. Las cifras devueltas desde PostgreSQL deben conservarse sin\nalteraciones.\n\n21. Si existen varias entidades que coinciden parcialmente con el\nnombre indicado, no elijas arbitrariamente una. Indica la ambigüedad.\n\n22. Para consultas de evolución presupuestaria utiliza la herramienta\nde consulta SQL de evolución cuando esté disponible.\n\n23. No intentes calcular una evolución histórica a partir de los\nfragmentos recuperados por knowledge_base.\n\n24. La herramienta SQL devuelve los registros agregados por entidad\ny año. Utiliza esos valores directamente.\n\n25. Si la consulta contiene una entidad pero no puede determinarse\nuna única entidad_id, solicita precisión o informa la ambigüedad."
+          "systemMessage": "Eres el agente orquestador de FinEdu-Bot.\n\nTu función es responder preguntas sobre información presupuestaria\ny documentación relacionada con el sector público peruano.\n\nDispones de tres herramientas:\n\nknowledge_base:\nBase de conocimiento RAG que utiliza PostgreSQL con PGVector.\nÚsala solo para consultas descriptivas o cuando la pregunta no\nmencione una entidad y un año concretos.\n\nconsulta_puntual:\nConsulta SQL exacta (sin similitud semántica) para el PIA, PIM,\ncertificado, comprometido, devengado o girado de UNA entidad en\nUN año específico, o todos los años de esa entidad si no se\nindica año. ÚSALA SIEMPRE que la pregunta mencione una entidad\ny, opcionalmente, un año concreto, en lugar de knowledge_base.\n\nconsulta_evolucion:\nConsulta SQL exacta que agrega PIA, PIM, certificado,\ncomprometido, devengado y girado por año para UNA entidad en\nun rango de años. Úsala para evolución, histórico, tendencia o\ncomparación entre años de la misma entidad.\n\nREGLAS:\n\n1. Para preguntas relacionadas con presupuesto, PIA, PIM, devengado,\n   ejecución presupuestaria, entidades públicas, departamentos,\n   provincias, municipalidades y datos contenidos en la base MEF,\n   utiliza knowledge_base.\n\n2. Antes de responder una consulta de datos, intenta obtener contexto\n   utilizando knowledge_base.\n\n3. No inventes cifras, nombres de entidades ni información que no\n   aparezca en el contexto recuperado.\n\n4. Si la herramienta no encuentra información suficiente, indícalo\n   claramente.\n\n5. Conserva el contexto de la conversación utilizando la sesión\n   proporcionada por el Webhook.\n\n6. Devuelve SIEMPRE la respuesta siguiendo el esquema estructurado\n   configurado para el agente.\n\n7. La propiedad risk debe contener exactamente uno de estos valores:\n\nSAFE\nHIGH_RISK\n\n8. Para consultas normales de información pública utiliza:\n\nrisk = SAFE\n\n9. No agregues texto fuera de la respuesta estructurada.\n\n10. Las consultas de evolución, histórico, tendencia o comparación\npor años deben utilizar datos estructurados de PostgreSQL.\n\n11. Nunca mezcles entidades diferentes en una misma evolución,\nsalvo que el usuario solicite explícitamente una comparación.\n\n12. Cuando exista una entidad concreta, identifica primero su\nentidad_id y utiliza ese identificador como filtro principal.\n\n13. Todos los registros de una evolución deben pertenecer a la misma\nentidad_id.\n\n14. Para una evolución agrupa los datos por entidad_id y anio.\n\n15. Calcula mediante suma únicamente:\nPIA, PIM, certificado, comprometido_anual, comprometido,\ndevengado y girado.\n\n16. No inventes años que no tengan registros.\n\n17. Si un año no tiene registros, indícalo como \"sin registro disponible\".\n\n18. No utilices similitud semántica de PGVector como criterio final\npara determinar qué registros pertenecen a una evolución histórica.\n\n19. PGVector se utiliza principalmente para recuperación contextual\ny consultas descriptivas.\n\n20. Las cifras devueltas desde PostgreSQL deben conservarse sin\nalteraciones.\n\n21. Si existen varias entidades que coinciden parcialmente con el\nnombre indicado, no elijas arbitrariamente una. Indica la ambigüedad.\n\n22. Para consultas de evolución presupuestaria utiliza SIEMPRE la\nherramienta consulta_evolucion.\n\n23. No intentes calcular una evolución histórica a partir de los\nfragmentos recuperados por knowledge_base.\n\n24. Las herramientas SQL devuelven los registros agregados por\nentidad y año. Utiliza esos valores directamente, sin alterarlos.\n\n25. Si la consulta contiene una entidad pero no puede determinarse\nuna única entidad_id (aparecen varias entidad_id distintas en el\nresultado de consulta_puntual o consulta_evolucion), solicita\nprecisión o informa la ambigüedad.\n\n26. Para preguntas sobre PIA, PIM, certificado, comprometido o\ndevengado/girado de una entidad en un año concreto (o en todos\nsus años), utiliza SIEMPRE consulta_puntual antes que\nknowledge_base. Solo usa knowledge_base si consulta_puntual no\ndevuelve registros y necesitas contexto descriptivo adicional.\n\n27. Si consulta_puntual devuelve cero filas, indica explícitamente\nque no hay registros para esa entidad y año en la base estructurada,\nen vez de asumir automáticamente que no existe información.\n\n28. Para intent=information_request, llama primero a consulta_puntual con la entidad (sin año) para traer todos los registros disponibles. Construye la respuesta únicamente a partir de esos registros (departamento, provincia, distrito, programas, montos). Si no hay registros, dilo explícitamente. Nunca completes con conocimiento general del modelo (alcaldes, contacto, historia, ubicación) que no venga de las herramientas."
         }
       },
       "id": "ed83f292-10f1-4e93-af3e-7069fe2699ca",
@@ -38,16 +38,18 @@
     },
     {
       "parameters": {
-        "model": "qwen/qwen3.8-27b",
-        "options": {}
+        "model": "groq/compound",
+        "options": {
+          "maxTokensToSample": 1500
+        }
       },
       "id": "416c03f2-5fcf-4f89-8789-a3a07b1ec8a0",
       "name": "Groq Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        -1024,
-        240
+        -1056,
+        144
       ],
       "credentials": {
         "groqApi": {
@@ -59,7 +61,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Webhook').item.json.body.sessionId || 'sesion-unica' }}",
+        "sessionKey": "={{ $('Webhook').item.json.body?.sessionId ?? $('Webhook').item.json.sessionId ?? 'sesion-unica' }}",
         "contextWindowLength": 10
       },
       "id": "dd3c048f-d646-4a09-ab70-833a95c63904",
@@ -67,13 +69,14 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.4,
       "position": [
-        -880,
-        224
+        -960,
+        240
       ]
     },
     {
       "parameters": {
-        "description": "Base RAG de datos presupuestarios del MEF.\n\nContiene registros de hecho_presupuesto indexados en\nrag_hecho_presupuesto mediante embeddings de Google Gemini.\n\nÚsala para consultas descriptivas y para recuperar contexto\nsobre entidades, presupuestos, departamentos, provincias,\ndistritos, programas presupuestales y clasificación del gasto.\n\nPara consultas de evolución o agregaciones históricas por año,\nla fuente de verdad debe ser PostgreSQL estructurado y no la\nsimilitud semántica de PGVector."
+        "description": "Base RAG de datos presupuestarios del MEF.\n\nContiene registros de hecho_presupuesto indexados en\nrag_hecho_presupuesto mediante embeddings de Google Gemini.\n\nÚsala para consultas descriptivas y para recuperar contexto\nsobre entidades, presupuestos, departamentos, provincias,\ndistritos, programas presupuestales y clasificación del gasto.\n\nPara consultas de evolución o agregaciones históricas por año,\nla fuente de verdad debe ser PostgreSQL estructurado y no la\nsimilitud semántica de PGVector.",
+        "topK": 3
       },
       "id": "3e8acb74-41ca-40d5-bca6-8db11c135c9a",
       "name": "knowledge_base",
@@ -86,8 +89,10 @@
     },
     {
       "parameters": {
-        "model": "qwen/qwen3.8-27b",
-        "options": {}
+        "model": "groq/compound",
+        "options": {
+          "maxTokensToSample": 1500
+        }
       },
       "id": "d89d9b5b-230e-44bc-904b-3f3362f57d46",
       "name": "Groq Chat Model1",
@@ -107,7 +112,6 @@
     {
       "parameters": {
         "tableName": "rag_hecho_presupuesto",
-        "useReranker": "",
         "options": {
           "columnNames": {
             "values": {}
@@ -119,8 +123,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
       "typeVersion": 1.3,
       "position": [
-        -496,
-        304
+        -464,
+        288
       ],
       "credentials": {
         "postgres": {
@@ -148,8 +152,114 @@
     },
     {
       "parameters": {
+        "description": "Consulta SQL estructurada contra el metadata JSON de rag_hecho_presupuesto que devuelve los registros exactos (PIA, PIM, certificado, comprometido, devengado, girado) de UNA entidad en UN año específico, o todos los años si no se indica año. Úsala SIEMPRE que la pregunta mencione una entidad y un año concretos (ej. PIM 2017 de X municipalidad), en lugar de knowledge_base. Requiere el nombre de la entidad y, si se conoce, el año.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "4ZH0A4bRpuaqDTRg",
+          "cachedResultName": "FinEdu - Consulta Puntual RAG"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "entidad": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('entidad', 'Nombre completo o parcial de la entidad ejecutora mencionada en la pregunta. Se usa con ILIKE.') }}",
+            "anio": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('anio', 'Año específico solicitado; deja vacío si la pregunta no menciona un año (entero, ejemplo: 2017).', 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "entidad",
+              "displayName": "entidad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "anio",
+              "displayName": "anio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "aa43c5f3-d5dc-4c1a-bfb8-dfcf56f6d00b",
+      "name": "consulta_puntual",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -864,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Consulta SQL estructurada que devuelve la evolución presupuestaria (PIA, PIM, certificado, comprometido, devengado, girado) de UNA entidad específica agrupada por año. Úsala cuando la pregunta pida evolución, histórico, tendencia o comparación entre varios años de la misma entidad. Requiere el nombre de la entidad y el rango de años.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BibDONx4HIe5z9KK",
+          "cachedResultName": "FinEdu - Consulta Evolucion SQL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "entidad": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('entidad', 'Nombre exacto o parcial de la entidad ejecutora a consultar (ejemplo: \"MUNICIPALIDAD DISTRITAL DE RIO TAMBO\"). Se usa con ILIKE.') }}",
+            "anioInicio": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('anioInicio', `Año inicial del rango de la evolución (entero, ejemplo: 2017).`, 'number') }}",
+            "anioFin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('anioFin', 'Año final del rango de la evolución (entero, ejemplo: 2023).', 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "entidad",
+              "displayName": "entidad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "anioInicio",
+              "displayName": "anioInicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "anioFin",
+              "displayName": "anioFin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "d0a3fdd2-3b79-4b28-8440-cad4f94dea14",
+      "name": "consulta_evolucion",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -656,
+        224
+      ]
+    },
+    {
+      "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"success\": {\n      \"type\": \"boolean\"\n    },\n    \"intent\": {\n      \"type\": \"string\"\n    },\n    \"message\": {\n      \"type\": \"string\"\n    },\n    \"output\": {\n      \"type\": \"string\"\n    },\n    \"risk\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"SAFE\",\n        \"HIGH_RISK\"\n      ]\n    },\n    \"evolucion\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"entidad\": {\n            \"type\": \"string\"\n          },\n          \"departamento\": {\n            \"type\": \"string\"\n          },\n          \"provincia\": {\n            \"type\": \"string\"\n          },\n          \"distrito\": {\n            \"type\": \"string\"\n          },\n          \"anio\": {\n            \"type\": \"integer\"\n          },\n          \"pia\": {\n            \"type\": \"number\"\n          },\n          \"pim\": {\n            \"type\": \"number\"\n          },\n          \"certificado\": {\n            \"type\": \"number\"\n          },\n          \"comprometido_anual\": {\n            \"type\": \"number\"\n          },\n          \"comprometido\": {\n            \"type\": \"number\"\n          },\n          \"devengado\": {\n            \"type\": \"number\"\n          },\n          \"girado\": {\n            \"type\": \"number\"\n          }\n        },\n        \"required\": [\n          \"entidad\",\n          \"departamento\",\n          \"provincia\",\n          \"distrito\",\n          \"anio\",\n          \"pia\",\n          \"pim\",\n          \"certificado\",\n          \"comprometido_anual\",\n          \"comprometido\",\n          \"devengado\",\n          \"girado\"\n        ]\n      }\n    },\n    \"presupuestos\": {\n      \"type\": \"array\"\n    },\n    \"proyectos\": {\n      \"type\": \"array\"\n    },\n    \"contrataciones\": {\n      \"type\": \"array\"\n    },\n    \"totalRegistros\": {\n      \"type\": \"integer\"\n    },\n    \"paginaActual\": {\n      \"type\": \"integer\"\n    },\n    \"tamanioPagina\": {\n      \"type\": \"integer\"\n    },\n    \"totalPaginas\": {\n      \"type\": \"integer\"\n    }\n  },\n  \"required\": [\n    \"success\",\n    \"intent\",\n    \"message\",\n    \"output\",\n    \"risk\",\n    \"evolucion\",\n    \"presupuestos\",\n    \"proyectos\",\n    \"contrataciones\",\n    \"totalRegistros\",\n    \"paginaActual\",\n    \"tamanioPagina\",\n    \"totalPaginas\"\n  ]\n}",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"success\": { \"type\": \"boolean\" },\n    \"intent\": { \"type\": \"string\" },\n    \"message\": { \"type\": \"string\" },\n    \"output\": { \"type\": \"string\" },\n    \"risk\": { \"type\": \"string\", \"enum\": [\"SAFE\", \"HIGH_RISK\"] },\n    \"evolucion\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"entidad\": { \"type\": \"string\" },\n          \"departamento\": { \"type\": \"string\" },\n          \"provincia\": { \"type\": \"string\" },\n          \"distrito\": { \"type\": \"string\" },\n          \"anio\": { \"type\": \"integer\" },\n          \"pia\": { \"type\": \"number\" },\n          \"pim\": { \"type\": \"number\" },\n          \"certificado\": { \"type\": \"number\" },\n          \"comprometido_anual\": { \"type\": \"number\" },\n          \"comprometido\": { \"type\": \"number\" },\n          \"devengado\": { \"type\": \"number\" },\n          \"girado\": { \"type\": \"number\" }\n        },\n        \"required\": [\"entidad\", \"departamento\", \"provincia\", \"distrito\", \"anio\", \"pia\", \"pim\", \"certificado\", \"comprometido_anual\", \"comprometido\", \"devengado\", \"girado\"]\n      }\n    },\n    \"presupuestos\": { \"type\": \"array\" },\n    \"proyectos\": { \"type\": \"array\" },\n    \"contrataciones\": { \"type\": \"array\" },\n    \"totalRegistros\": { \"type\": \"integer\" },\n    \"paginaActual\": { \"type\": \"integer\" },\n    \"tamanioPagina\": { \"type\": \"integer\" },\n    \"totalPaginas\": { \"type\": \"integer\" }\n  },\n  \"required\": [\"success\", \"intent\", \"message\", \"output\", \"risk\", \"evolucion\", \"presupuestos\", \"proyectos\", \"contrataciones\", \"totalRegistros\", \"paginaActual\", \"tamanioPagina\", \"totalPaginas\"]\n}",
         "autoFix": true
       },
       "id": "3bca6561-f22f-4934-b2a5-d105b9bf76b6",
@@ -157,22 +267,24 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        -768,
-        256
+        -832,
+        352
       ]
     },
     {
       "parameters": {
-        "model": "qwen/qwen3.8-27b",
-        "options": {}
+        "model": "groq/compound",
+        "options": {
+          "maxTokensToSample": 1500
+        }
       },
       "id": "287bf063-0b07-4e9d-a0a9-b9dfe7d6a0f5",
       "name": "Groq Chat Model (Parser)",
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        -656,
-        448
+        -1088,
+        368
       ],
       "credentials": {
         "groqApi": {
@@ -247,7 +359,7 @@
           "value": "#auditoria",
           "mode": "name"
         },
-        "text": "=🚨 Alerta de alto riesgo (Human-in-the-loop) para sesión {{ $('Webhook').item.json.body.sessionId }}:\n\n{{ $json.output }}",
+        "text": "=🚨 Alerta de alto riesgo (Human-in-the-loop) para sesión {{ $('Webhook').item.json.body?.sessionId ?? $('Webhook').item.json.sessionId ?? 'sesion-unica' }}:\n\n{{ $json.output }}",
         "otherOptions": {}
       },
       "id": "baf03070-b50c-4777-bf93-b72b028e5621",
@@ -258,7 +370,7 @@
         32,
         -64
       ],
-      "webhookId": "6d23babe-a582-480a-b9d9-bf7cc496a7ca",
+      "webhookId": "8fe1d36d-518c-4bd0-9f12-9b3af629c029",
       "credentials": {
         "slackApi": {
           "id": "iOtWo40md3SkFm63",
@@ -387,6 +499,28 @@
         ]
       ]
     },
+    "consulta_puntual": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consulta_evolucion": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Structured Output Parser": {
       "ai_outputParser": [
         [
@@ -450,12 +584,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "b9b0f6dd-eeed-4693-8809-c286404e0da0",
+  "versionId": "4663bab4-da50-4c1e-99c5-e4e5b5abea79",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "6289dccf99b97d75fe3bc260da322ee7e5286620b35ac2c234a2adac2e58e0c4"

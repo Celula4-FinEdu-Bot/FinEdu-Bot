@@ -1,0 +1,132 @@
+{
+  "name": "Reindexación RAG Presupuesto",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "955155ae-a266-43b5-896d-8afe139b6c4e",
+      "name": "When clicking Test workflow",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    id,\n    content\nFROM rag_hecho_presupuesto\nORDER BY id;",
+        "options": {}
+      },
+      "id": "e2aba06a-7896-461f-be2e-e7fc8cff7b95",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "I7gbMKqHXsUfvDPz",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"model\": \"models/gemini-embedding-001\", \"content\": { \"parts\": [ { \"text\": {{ JSON.stringify($json.content) }} } ] } }",
+        "options": {}
+      },
+      "id": "6d2a5873-06a9-4f58-a67f-6fc7d1ea5ccb",
+      "name": "Embeddings Google Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IUpqb8oztK6t1V2r",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag_hecho_presupuesto SET embedding = '[{{ $json.embedding.values.join(',') }}]'::vector WHERE id = {{ $('Postgres').item.json.id }};",
+        "options": {}
+      },
+      "id": "70d76915-5013-49a5-b293-ccea2d70530b",
+      "name": "Update Embedding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "I7gbMKqHXsUfvDPz",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking Test workflow": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Embeddings Google Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "main": [
+        [
+          {
+            "node": "Update Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ebb4b1b3-504b-45e0-8234-677572c4943d",
+  "meta": {
+    "instanceId": "6289dccf99b97d75fe3bc260da322ee7e5286620b35ac2c234a2adac2e58e0c4"
+  },
+  "nodeGroups": [],
+  "id": "bJk9KSZY8drZac0Y",
+  "tags": []
+}

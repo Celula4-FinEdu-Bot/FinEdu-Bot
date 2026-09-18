@@ -1,0 +1,81 @@
+{
+  "name": "FinEdu - Consulta Evolucion SQL",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "entidad"
+            },
+            {
+              "name": "anioInicio",
+              "type": "number"
+            },
+            {
+              "name": "anioFin",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "102c793d-577a-4fd3-b749-801029a96366",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    e.id AS entidad_id,\n    e.ejecutora_nombre AS entidad,\n    e.departamento_ejecutora_nombre AS departamento,\n    e.provincia_ejecutora_nombre AS provincia,\n    e.distrito_ejecutora_nombre AS distrito,\n    h.anio,\n    SUM(COALESCE(h.pia, 0)) AS pia,\n    SUM(COALESCE(h.pim, 0)) AS pim,\n    SUM(COALESCE(h.certificado, 0)) AS certificado,\n    SUM(COALESCE(h.comprometido_anual, 0)) AS comprometido_anual,\n    SUM(COALESCE(h.comprometido, 0)) AS comprometido,\n    SUM(COALESCE(h.devengado, 0)) AS devengado,\n    SUM(COALESCE(h.girado, 0)) AS girado\nFROM hecho_presupuesto h\nINNER JOIN dim_entidad e\n    ON e.id = h.entidad_id\nWHERE\n    e.ejecutora_nombre ILIKE '%' || $1 || '%'\n    AND h.anio BETWEEN $2 AND $3\nGROUP BY\n    e.id,\n    e.ejecutora_nombre,\n    e.departamento_ejecutora_nombre,\n    e.provincia_ejecutora_nombre,\n    e.distrito_ejecutora_nombre,\n    h.anio\nORDER BY e.id, h.anio;",
+        "options": {
+          "queryReplacement": "={{ $json.entidad }},={{ $json.anioInicio }},={{ $json.anioFin }}"
+        }
+      },
+      "id": "b5cb08cb-efda-40cf-9318-fb9be2c7c688",
+      "name": "Consulta Evolucion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "I7gbMKqHXsUfvDPz",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Consulta Evolucion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "489c7b68-1195-471b-a060-83308620c16a",
+  "meta": {
+    "instanceId": "6289dccf99b97d75fe3bc260da322ee7e5286620b35ac2c234a2adac2e58e0c4"
+  },
+  "nodeGroups": [],
+  "id": "BibDONx4HIe5z9KK",
+  "tags": []
+}
