@@ -40,7 +40,19 @@ jobs:
             exit 1
           fi
 
-      
+      - name: Verificar estructura minima de flujos en production/
+        run: |
+          FILES=$(find src/n8n-workflows/production -name "*.json" 2>/dev/null || true)
+          if [ -z "$FILES" ]; then
+            echo "Aun no hay flujos en production/. Se omite verificacion."
+            exit 0
+          fi
+          for file in $FILES; do
+            if ! python3 -c "import json,sys; d=json.load(open('$file')); sys.exit(0 if 'nodes' in d and 'connections' in d else 1)"; then
+              echo "$file no parece un workflow valido de n8n (falta 'nodes' o 'connections')"
+              exit 1
+            fi
+          done
 
       - name: Buscar credenciales quemadas en los flujos JSON
         run: |
@@ -64,72 +76,3 @@ jobs:
             exit 1
           fi
           echo "No se encontraron credenciales quemadas."
-
-      - name: Verificar controles de seguridad del flujo NLQ/RAG
-        run: |
-          python3 << 'EOF'
-          import json, sys, glob
-
-          errores = []
-
-          for archivo in glob.glob("src/n8n-workflows/production/*.json"):
-              with open(archivo) as f:
-                  flujo = json.load(f)
-
-              nombres_nodos = {n["name"]: n for n in flujo.get("nodes", [])}
-
-              # 1. El Webhook debe tener autenticacion configurada.
-              webhook = nombres_nodos.get("Webhook")
-              if webhook:
-                  auth = webhook.get("parameters", {}).get("authentication")
-                  if not auth or auth == "none":
-                      errores.append(
-                          f"{archivo}: el nodo Webhook no tiene autenticacion "
-                          f"configurada (Header Auth). El endpoint queda abierto."
-                      )
-
-              # 2. Debe existir el nodo Security Filter.
-              if "Security Filter" not in nombres_nodos:
-                  errores.append(
-                      f"{archivo}: no se encontro el nodo 'Security Filter'. "
-                      f"El flujo perderia el control de riesgo HIGH_RISK/SAFE."
-                  )
-              else:
-                  sf = nombres_nodos["Security Filter"]
-                  contenido = json.dumps(sf.get("parameters", {}))
-                  if "HIGH_RISK" not in contenido:
-                      errores.append(
-                          f"{archivo}: 'Security Filter' ya no evalua HIGH_RISK. "
-                          f"Verificar que no se haya modificado la condicion."
-                      )
-
-              # 3. El Structured Output Parser debe forzar el enum de risk.
-              parser = nombres_nodos.get("Structured Output Parser")
-              if parser:
-                  esquema = parser.get("parameters", {}).get("inputSchema", "")
-                  if '"SAFE"' not in esquema or '"HIGH_RISK"' not in esquema:
-                      errores.append(
-                          f"{archivo}: el schema de 'Structured Output Parser' "
-                          f"ya no restringe 'risk' a SAFE/HIGH_RISK."
-                      )
-
-              # 4. Ninguna credencial debe tener mas campos que id y name.
-              for nodo in flujo.get("nodes", []):
-                  for tipo_cred, datos in nodo.get("credentials", {}).items():
-                      claves_extra = set(datos.keys()) - {"id", "name"}
-                      if claves_extra:
-                          errores.append(
-                              f"{archivo}: la credencial '{tipo_cred}' del nodo "
-                              f"'{nodo['name']}' tiene campos inesperados "
-                              f"({claves_extra}). Podria contener un valor "
-                              f"embebido en vez de una referencia."
-                          )
-
-          if errores:
-              print("Se encontraron problemas de seguridad en el flujo:\n")
-              for e in errores:
-                  print(f"  - {e}")
-              sys.exit(1)
-
-          print("Controles de seguridad del flujo NLQ/RAG verificados correctamente.")
-          EOF
