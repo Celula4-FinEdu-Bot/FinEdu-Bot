@@ -123,7 +123,7 @@ C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\n
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\scopedcss\Components\Layout\NavMenu.razor.rz.scp.css
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\scopedcss\bundle\src.styles.css
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\scopedcss\projectbundle\src.bundle.scp.css
-C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\compressed\us58a3vv85-3bkpd57hal.gz
+C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\compressed\us58a3vv85-n6g530xuye.gz
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\compressed\zljh3ljklr-t1cqhe9u97.gz
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\compressed\ztsq1e9txz-c2jlpeoesf.gz
 C:\Users\USUARIO\Downloads\Frontendcaso5\FinEdu-Bot\src\frontend\src\obj\Debug\net9.0\compressed\709hkr7ox1-sejl45xvog.gz
