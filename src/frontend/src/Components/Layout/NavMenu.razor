@@ -1,86 +1,96 @@
-﻿<div class="sidebar-brand">
+﻿<AuthorizeView>
 
-    <div class="brand-mark">
-        F
-    </div>
+    <Authorized>
 
-    <div>
-        <strong>
-            FinEdu-Bot
-        </strong>
+        <div class="sidebar-brand">
 
-        <span>
-            Transparencia pública
-        </span>
-    </div>
+            <div class="brand-mark">
+                F
+            </div>
 
-</div>
+            <div>
+                <strong>FinEdu-Bot</strong>
 
-<nav class="nav-menu">
+                <span>
+                    Transparencia pública
+                </span>
+            </div>
 
-    <div class="nav-section">
-        CONSULTAS
-    </div>
+        </div>
 
-    <NavLink
-        href="/"
-        Match="NavLinkMatch.All"
-        class="nav-link">
+        <nav class="nav-menu">
 
-        <span class="nav-icon">
-            ⌂
-        </span>
+            <div class="nav-section">
+                CONSULTAS
+            </div>
 
-        <span>
-            Inicio / NLQ
-        </span>
+            <NavLink
+                href="/"
+                Match="NavLinkMatch.All"
+                class="nav-link">
 
-    </NavLink>
+                <span class="nav-icon">
+                    ⌂
+                </span>
 
-    <NavLink
-        href="/presupuesto"
-        class="nav-link">
+                <span>
+                    Inicio / NLQ
+                </span>
 
-        <span class="nav-icon">
-            $
-        </span>
+            </NavLink>
 
-        <span>
-            Presupuesto
-        </span>
+            <div class="nav-section">
+                INFORMACIÓN
+            </div>
 
-    </NavLink>
+            <NavLink
+                href="/presupuesto"
+                class="nav-link">
 
-    <NavLink
-        href="/proyectos"
-        class="nav-link">
+                <span class="nav-icon">
+                    $
+                </span>
 
-        <span class="nav-icon">
-            #
-        </span>
+                <span>
+                    Presupuesto
+                </span>
 
-        <span>
-            Proyectos
-        </span>
+            </NavLink>
 
-    </NavLink>
+            <NavLink
+                href="/proyectos"
+                class="nav-link">
 
-    <div class="nav-section">
-        CONTRATACIONES
-    </div>
+                <span class="nav-icon">
+                    #
+                </span>
 
-    <NavLink
-        href="/contrataciones"
-        class="nav-link">
+                <span>
+                    Proyectos
+                </span>
 
-        <span class="nav-icon">
-            +
-        </span>
+            </NavLink>
 
-        <span>
-            OECE
-        </span>
+            <div class="nav-section">
+                CONTRATACIONES
+            </div>
 
-    </NavLink>
+            <NavLink
+                href="/contrataciones"
+                class="nav-link">
 
-</nav>
+                <span class="nav-icon">
+                    ◈
+                </span>
+
+                <span>
+                    OECE
+                </span>
+
+            </NavLink>
+
+        </nav>
+
+    </Authorized>
+
+</AuthorizeView>
