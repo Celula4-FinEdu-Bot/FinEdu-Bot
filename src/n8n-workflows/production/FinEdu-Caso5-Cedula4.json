@@ -42,8 +42,8 @@
       "position": [-624, 112],
       "credentials": {
         "googlePalmApi": {
-          "id": "IVSRSj4mWu08BJH8",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "GEMINI_CRED_ID",
+          "name": "Google Gemini API"
         }
       }
     },
@@ -81,8 +81,8 @@
       "position": [240, 240],
       "credentials": {
         "googlePalmApi": {
-          "id": "IVSRSj4mWu08BJH8",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "GEMINI_CRED_ID",
+          "name": "Google Gemini API"
         }
       }
     },
@@ -102,8 +102,8 @@
       "position": [-32, 256],
       "credentials": {
         "postgres": {
-          "id": "JEI91kyfMHzcxS28",
-          "name": "Postgres account"
+          "id": "POSTGRES_CRED_ID",
+          "name": "PostgreSQL Database"
         }
       }
     },
@@ -116,8 +116,8 @@
       "position": [64, 432],
       "credentials": {
         "googlePalmApi": {
-          "id": "IVSRSj4mWu08BJH8",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "GEMINI_CRED_ID",
+          "name": "Google Gemini API"
         }
       }
     },
@@ -244,8 +244,8 @@
       "position": [-656, 336],
       "credentials": {
         "googlePalmApi": {
-          "id": "IVSRSj4mWu08BJH8",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "GEMINI_CRED_ID",
+          "name": "Google Gemini API"
         }
       }
     },
@@ -303,42 +303,6 @@
     },
     {
       "parameters": {
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "value": "#auditoria",
-          "mode": "name"
-        },
-        "text": "=🚨 Alerta de alto riesgo (Human-in-the-loop) para sesión {{ $('Webhook').item.json.body?.sessionId ?? $('Webhook').item.json.sessionId ?? 'sesion-unica' }}:\n\n{{ $json.output }}",
-        "otherOptions": {}
-      },
-      "id": "0a4833b2-00f2-4789-a949-b1f322afdc79",
-      "name": "Slack Alert",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [464, -96],
-      "webhookId": "8fe1d36d-518c-4bd0-9f12-9b3af629c029",
-      "credentials": {
-        "slackApi": {
-          "id": "ZkLFrULIkdzUV6RW",
-          "name": "Slack account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "respondWith": "text",
-        "responseBody": "Tu consulta no pudo ser procesada por políticas de seguridad",
-        "options": {}
-      },
-      "id": "3d640ba7-ceff-4f48-84c1-07060ee2b6ef",
-      "name": "Respond to Webhook1",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [688, -96]
-    },
-    {
-      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ {\n  success: $json.success ?? false,\n  intent: $json.intent ?? \"NoReconocido\",\n  message: $json.message ?? \"\",\n  output: $json.output ?? \"\",\n  risk: $json.risk ?? \"SAFE\",\n  evolucion: $json.evolucion ?? [],\n  presupuestos: $json.presupuestos ?? [],\n  proyectos: $json.proyectos ?? [],\n  contrataciones: $json.contrataciones ?? [],\n  totalRegistros: $json.totalRegistros ?? 0,\n  paginaActual: $json.paginaActual ?? 1,\n  tamanioPagina: $json.tamanioPagina ?? 10,\n  totalPaginas: $json.totalPaginas ?? 1\n} }}",
         "options": {}
@@ -348,25 +312,6 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [464, 96]
-    },
-    {
-      "parameters": {
-        "model": "openai/gpt-oss-20b",
-        "options": {
-          "maxTokensToSample": 1000
-        }
-      },
-      "id": "fb1fb1fb-0001-4e11-9a11-777777777777",
-      "name": "Groq Chat Model (Fallback)",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-      "typeVersion": 1,
-      "position": [-256, -160],
-      "credentials": {
-        "groqApi": {
-          "id": "2gk1FxnrkRCr7oZl",
-          "name": "Groq account"
-        }
-      }
     }
   ],
   "pinData": {},
@@ -518,38 +463,9 @@
       "main": [
         [
           {
-            "node": "Slack Alert",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Respond to Webhook",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Slack Alert": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Groq Chat Model (Fallback)": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_languageModel",
-            "index": 1
           }
         ]
       ]
