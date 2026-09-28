@@ -1,13 +1,13 @@
+using src.Interfaces;
 using src.Models;
 
 namespace src.Services;
 
 public sealed class NlqService
 {
-    private readonly BackendService _backendService;
+    private readonly IBackendService _backendService;
 
-    public NlqService(
-        BackendService backendService)
+    public NlqService(IBackendService backendService)
     {
         _backendService = backendService;
     }
@@ -29,8 +29,7 @@ public sealed class NlqService
             };
         }
 
-        sessionId ??=
-            Guid.NewGuid().ToString("N");
+        sessionId ??= Guid.NewGuid().ToString("N");
 
         return await _backendService.ConsultarAsync(
             pregunta.Trim(),
