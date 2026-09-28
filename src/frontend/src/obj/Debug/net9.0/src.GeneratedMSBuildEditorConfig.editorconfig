@@ -32,6 +32,10 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHAucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Layout/LoginLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTG9naW5MYXlvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Pages/Contrataciones.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb250cmF0YWNpb25lcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -48,6 +52,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xIb21lLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Pages/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xMb2dpbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Pages/Presupuesto.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xQcmVzdXB1ZXN0by5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -58,6 +66,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXZWF0aGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/RedirectToLogin.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSZWRpcmVjdFRvTG9naW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/USUARIO/Downloads/Frontendcaso5/FinEdu-Bot/src/frontend/src/Components/Routes.razor]
