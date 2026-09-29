@@ -1,0 +1,53 @@
+@page "/login"
+
+@using Microsoft.AspNetCore.Authorization
+@using src.Components.Layout
+@attribute [AllowAnonymous]
+@layout LoginLayout
+
+<PageTitle>Iniciar sesión - FinEdu-Bot</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+
+        <div class="login-header">
+            <div class="login-logo">FE</div>
+            <h1>FinEdu-Bot</h1>
+            <p>Monitor de Transparencia Económica</p>
+        </div>
+
+        <form method="post" action="/account/login" data-enhance="false">
+
+            <div class="login-field">
+                <label for="username">Usuario</label>
+                <input id="username"
+                       name="username"
+                       type="text"
+                       placeholder="Ingrese su usuario"
+                       autocomplete="username"
+                       required />
+            </div>
+
+            <div class="login-field">
+                <label for="password">Contraseña</label>
+                <input id="password"
+                       name="password"
+                       type="password"
+                       placeholder="Ingrese su contraseña"
+                       autocomplete="current-password"
+                       required />
+            </div>
+
+            <button type="submit" class="login-button">
+                Iniciar sesión
+            </button>
+
+        </form>
+
+        <div class="login-demo">
+            <strong>Acceso de prueba</strong>
+            <span>admin / Admin123*</span>
+        </div>
+
+    </div>
+</div>
