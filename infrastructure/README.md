@@ -21,6 +21,6 @@ Configúralas **directamente en el panel de Vercel** (Project Settings → Envir
 Desde dentro de esta carpeta, ejecuta:
 
 ```bash
-cd infrastructure/n8n-vercel
+cd infrastructure
 npx vercel
 ```
