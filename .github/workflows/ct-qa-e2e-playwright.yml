@@ -38,16 +38,25 @@ jobs:
           dotnet publish -c Release -o "$GITHUB_WORKSPACE/publish"
 
       - name: Levantar la app en background
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings_DefaultConnection: ${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}
+          Backend__BaseUrl: http://localhost:3000
         run: |
           nohup dotnet "$GITHUB_WORKSPACE/publish/src.dll" --urls=http://localhost:5204 > app.log 2>&1 &
+          APP_PID=$!
+          echo "App PID: $APP_PID"
+
           echo "Esperando a que la app responda en localhost:5204..."
           for i in $(seq 1 30); do
-            if curl -sSf http://localhost:5204 > /dev/null; then
-              echo "App arriba."
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5204/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "302" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "App respondió con HTTP $code"
               break
             fi
             if [ "$i" -eq 30 ]; then
               echo "::error::La app no respondió a tiempo."
+              echo "=== app.log ==="
               cat app.log
               exit 1
             fi

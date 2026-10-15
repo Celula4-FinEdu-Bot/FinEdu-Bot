@@ -20,25 +20,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validar sintaxis JSON
+        shell: bash
         run: |
           echo "Validando archivos JSON de n8n..."
-          FILES=$(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null || true)
-          if [ -z "$FILES" ]; then
+
+          error_found=0
+          file_found=0
+
+          while IFS= read -r -d '' file; do
+            file_found=1
+
+            if python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "OK: $file"
+            else
+              echo "JSON invalido: $file"
+              error_found=1
+            fi
+          done < <(
+            find src/n8n-workflows/production src/n8n-workflows/templates \
+              -type f -name "*.json" -print0 2>/dev/null
+          )
+
+          if [ "$file_found" -eq 0 ]; then
             echo "Aun no hay flujos JSON. Se omite validacion."
             exit 0
           fi
-          error_found=0
-          for file in $FILES; do
-            if ! python3 -m json.tool "$file" > /dev/null 2>&1; then
-              echo "JSON invalido: $file"
-              error_found=1
-            else
-              echo "OK: $file"
-            fi
-          done
-          if [ $error_found -eq 1 ]; then
+
+          if [ "$error_found" -eq 1 ]; then
+            echo "Se encontraron archivos JSON invalidos."
             exit 1
           fi
+
+          echo "Todos los archivos JSON son validos."
 
       - name: Verificar estructura minima de flujos en production/
         run: |
