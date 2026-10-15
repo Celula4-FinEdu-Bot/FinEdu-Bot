@@ -22,9 +22,20 @@ public sealed class BackendService
         string sessionId,
         CancellationToken cancellationToken = default)
     {
-        var baseUrl =
-            _configuration["Backend:BaseUrl"]
-            ?? "http://localhost:3000";
+        /// <summary>
+        /// se cambio por esta configuración para que se usara desde el appsetting tanto en local comoo desplegado en render.
+        /// </summary>
+        var baseUrl = _configuration["Backend:BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return new NlqResponse
+            {
+                Success = false,
+                Intent = "ErrorConfiguracion",
+                Message = "No está configurada la URL del backend."
+            };
+        }
 
         var url =
             $"{baseUrl.TrimEnd('/')}/api/chat";

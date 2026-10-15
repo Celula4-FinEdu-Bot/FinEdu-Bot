@@ -1,39 +1,87 @@
-﻿@inherits LayoutComponentBase
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inherits LayoutComponentBase
 
-<div class="app-shell">
+<AuthorizeView>
 
-    <aside class="sidebar">
+    <Authorized>
 
-        <NavMenu />
+        <div class="app-shell">
 
-    </aside>
+            <aside class="sidebar">
 
-    <main class="main-content">
+                <NavMenu />
 
-        <header class="topbar">
+            </aside>
 
-            <div>
-                <span class="topbar-title">
-                    Monitor de Transparencia
-                </span>
-            </div>
+            <main class="main-content">
 
-            <div class="topbar-status">
+                <header class="topbar">
 
-                <span class="status-dot"></span>
+                    <div class="topbar-title-group">
 
-                Sistema activo
+                        <span class="topbar-title">
+                            Monitor de Transparencia
+                        </span>
 
-            </div>
+                        <span class="topbar-subtitle">
+                            FinEdu-Bot
+                        </span>
 
-        </header>
+                    </div>
 
-        <section class="content">
+                    <div class="topbar-user">
 
-            @Body
+                        <div class="user-info">
 
-        </section>
+                            <strong>
+                                @context.User.FindFirst("FullName")?.Value
+                            </strong>
 
-    </main>
+                            <span>
+                                @context.User.FindFirst(
+                                    "RoleName")?.Value
+                            </span>
 
-</div>
+                        </div>
+
+                        <div class="user-avatar">
+                            @(
+                                context.User.Identity?.Name?
+                                    .Substring(0, 1)
+                                    .ToUpper()
+                                ?? "U"
+                            )
+                        </div>
+
+                        <form
+                            method="post"
+                            action="/account/logout"
+                            data-enhance="false">
+
+                            <button
+                                type="submit"
+                                class="logout-button">
+
+                                Salir
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </header>
+
+                <section class="content">
+
+                    @Body
+
+                </section>
+
+            </main>
+
+        </div>
+
+    </Authorized>
+
+</AuthorizeView>
