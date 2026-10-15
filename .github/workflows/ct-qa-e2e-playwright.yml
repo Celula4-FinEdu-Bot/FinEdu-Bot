@@ -40,7 +40,7 @@ jobs:
       - name: Levantar la app en background
         env:
           ASPNETCORE_ENVIRONMENT: Production
-          ConnectionStrings__DefaultConnection: ${{ secrets.CONNECTIONSTRINGS__DEFAULTCONNECTION }}
+          ConnectionStrings_DefaultConnection: ${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}
           Backend__BaseUrl: http://localhost:3000
         run: |
           nohup dotnet "$GITHUB_WORKSPACE/publish/src.dll" --urls=http://localhost:5204 > app.log 2>&1 &
@@ -63,7 +63,6 @@ jobs:
             sleep 2
           done
 
-          
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
