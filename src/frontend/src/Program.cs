@@ -51,6 +51,7 @@ builder.Services.AddScoped<MefService>();
 builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
+builder.Services.AddScoped<OeceBackendService>();
 
 var app = builder.Build();
 
