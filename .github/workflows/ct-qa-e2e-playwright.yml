@@ -1,0 +1,102 @@
+name: QA E2E (Playwright)
+
+# Ya no depende del CI del frontend ni se encadena a él. Corre de forma
+# independiente en cada PR, como un check más (igual que SAST, SCA, etc.).
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  e2e-tests:
+    name: e2e-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Verificar que la carpeta de pruebas E2E existe
+        run: |
+          if [ ! -d "src/ia-ops/tests/e2e" ]; then
+            echo "::error::La carpeta src/ia-ops/tests/e2e no existe en este commit/rama."
+            echo "Verifica que fue commiteada y que estás probando la rama correcta."
+            exit 1
+          fi
+          echo "Carpeta de pruebas E2E encontrada."
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publicar la app Blazor
+        working-directory: src/frontend/src
+        run: |
+          dotnet restore
+          dotnet publish -c Release -o "$GITHUB_WORKSPACE/publish"
+
+      - name: Levantar la app en background
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings_DefaultConnection: ${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}
+          Backend__BaseUrl: http://localhost:3000
+        run: |
+          nohup dotnet "$GITHUB_WORKSPACE/publish/src.dll" --urls=http://localhost:5204 > app.log 2>&1 &
+          APP_PID=$!
+          echo "App PID: $APP_PID"
+
+          echo "Esperando a que la app responda en localhost:5204..."
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5204/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "302" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "App respondió con HTTP $code"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::La app no respondió a tiempo."
+              echo "=== app.log ==="
+              cat app.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias de Playwright
+        working-directory: src/ia-ops/tests/e2e
+        run: npm ci
+
+      - name: Instalar navegadores de Playwright
+        working-directory: src/ia-ops/tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Ejecutar pruebas E2E
+        working-directory: src/ia-ops/tests/e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:5204
+          CI: "true"
+        run: npx playwright test
+
+      - name: Subir log de la app (si algo falla al levantar)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Publicar reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: src/ia-ops/tests/e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
