@@ -1,44 +1,84 @@
+
 using System.Security.Claims;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+
 using Npgsql;
+
 using src.Components;
 using src.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================================
-// CONFIGURACIÓN (JSON + User Secrets + Env Vars)
-// Orden de precedencia (último gana):
-//   appsettings.json < appsettings.{Env}.json < User Secrets < Env Vars
+// CONFIGURACIÓN
+//
+// WebApplication.CreateBuilder carga appsettings, User Secrets
+// en desarrollo y variables de entorno.
+// En Render, las variables de entorno tienen prioridad sobre
+// los valores de configuración de los archivos JSON.
 // ============================================================
 
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json",
-                 optional: true, reloadOnChange: true);
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Configuration.AddUserSecrets<Program>(optional: true);
-}
-
-builder.Configuration.AddEnvironmentVariables();
-
-// Validación temprana: falla rápido si falta la cadena de conexión
-var connStringPreview = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connStringPreview))
+if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
         "Falta ConnectionStrings:DefaultConnection. " +
-        "En desarrollo usa 'dotnet user-secrets set'. " +
-        "En producción configura la variable de entorno 'ConnectionStrings__DefaultConnection'.");
+        "En desarrollo configura User Secrets. " +
+        "En Render configura ConnectionStrings__DefaultConnection.");
 }
 
+// ============================================================
+// DATA PROTECTION
+//
+// No se configura una ruta de claves ni un certificado.
+// ASP.NET Core utilizará su almacenamiento predeterminado.
+//
+// En el plan gratuito de Render, las claves pueden perderse
+// cuando se destruye el contenedor. Esto puede cerrar sesiones
+// existentes después de un reinicio o redespliegue.
+// ============================================================
+
+builder.Services
+    .AddDataProtection()
+    .SetApplicationName("FinEduBot");
 
 // ============================================================
-// RAZOR COMPONENTS
+// PROXY INVERSO DE RENDER
+//
+// Render termina HTTPS y reenvía la petición al contenedor.
+// Procesar X-Forwarded-Proto antes de HTTPS redirection evita
+// que ASP.NET Core interprete erróneamente la petición como HTTP.
+//
+// La limpieza de proxies conocidos presupone que el servicio
+// solo recibe tráfico web a través del proxy de Render.
+// ============================================================
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+
+    if (!builder.Environment.IsDevelopment())
+    {
+        // Render puede usar direcciones variables para sus proxies.
+        // Solo usar este ajuste si el contenedor está protegido
+        // detrás del proxy de Render y no expuesto directamente.
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
+});
+
+// ============================================================
+// RAZOR COMPONENTS / BLAZOR
 // ============================================================
 
 builder.Services
@@ -46,7 +86,7 @@ builder.Services
     .AddInteractiveServerComponents();
 
 // ============================================================
-// AUTENTICACIÓN
+// AUTENTICACIÓN POR COOKIES
 // ============================================================
 
 builder.Services
@@ -63,7 +103,12 @@ builder.Services
 
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // En producción, la cookie solo se envía mediante HTTPS.
+        options.Cookie.SecurePolicy =
+            builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
     });
 
 builder.Services.AddAuthorization();
@@ -85,8 +130,11 @@ builder.Services.AddScoped<OeceBackendService>();
 var app = builder.Build();
 
 // ============================================================
-// PIPELINE
+// PIPELINE HTTP
 // ============================================================
+
+// Debe ejecutarse antes de HSTS y de HTTPS redirection.
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -98,10 +146,10 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 
-app.UseAntiforgery();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseAntiforgery();
 
 // ============================================================
 // LOGIN
@@ -122,30 +170,28 @@ app.MapPost("/account/login", async (
         return Results.Redirect("/login?error=1");
     }
 
-    var connectionString =
+    var loginConnectionString =
         configuration.GetConnectionString("DefaultConnection");
 
-    if (string.IsNullOrWhiteSpace(connectionString))
+    if (string.IsNullOrWhiteSpace(loginConnectionString))
     {
         return Results.Problem(
             "No se encontró ConnectionStrings:DefaultConnection");
     }
 
     await using var connection =
-        new NpgsqlConnection(connectionString);
+        new NpgsqlConnection(loginConnectionString);
 
     await connection.OpenAsync();
 
-    await using var command =
-        new NpgsqlCommand(
-            "SELECT * FROM authenticate_app_user($1, $2)",
-            connection);
+    await using var command = new NpgsqlCommand(
+        "SELECT * FROM authenticate_app_user($1, $2)",
+        connection);
 
     command.Parameters.AddWithValue(username);
     command.Parameters.AddWithValue(password);
 
-    await using var reader =
-        await command.ExecuteReaderAsync();
+    await using var reader = await command.ExecuteReaderAsync();
 
     if (!await reader.ReadAsync())
     {
@@ -160,22 +206,17 @@ app.MapPost("/account/login", async (
 
     var claims = new List<Claim>
     {
-        new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-        new Claim(ClaimTypes.Name, dbUsername),
-        new Claim("FullName", fullName),
-        new Claim(ClaimTypes.Role, roleCode),
-        new Claim("RoleName", roleName)
+        new(ClaimTypes.NameIdentifier, userId.ToString()),
+        new(ClaimTypes.Name, dbUsername),
+        new("FullName", fullName),
+        new(ClaimTypes.Role, roleCode),
+        new("RoleName", roleName)
     };
 
-    var identity = new ClaimsIdentity(
-        claims,
-        "FinEduCookie");
-
+    var identity = new ClaimsIdentity(claims, "FinEduCookie");
     var principal = new ClaimsPrincipal(identity);
 
-    await httpContext.SignInAsync(
-        "FinEduCookie",
-        principal);
+    await httpContext.SignInAsync("FinEduCookie", principal);
 
     return Results.Redirect("/");
 });
