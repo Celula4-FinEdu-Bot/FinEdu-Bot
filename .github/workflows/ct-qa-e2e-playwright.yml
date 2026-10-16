@@ -106,7 +106,7 @@ jobs:
 
       - name: Subir log de Blazor
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-log
           path: app.log
@@ -115,7 +115,7 @@ jobs:
 
       - name: Subir reporte Playwright
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: src/ia-ops/tests/e2e/playwright-report/
