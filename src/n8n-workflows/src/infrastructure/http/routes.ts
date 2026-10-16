@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { chatController } from './controllers/chat.controller';
 import { healthController } from './controllers/health.controller';
 import { mefController } from './controllers/mef.controller';
+import { oeceController } from './controllers/oece.controller';
+
 
 export function buildRoutes() {
   const router = Router();
@@ -12,6 +14,8 @@ export function buildRoutes() {
   router.post('/chat', chatController.handle);
 
   router.post('/mef/query', mefController.query);
+
+  router.post('/oece/query', oeceController.query);
 
   return router;
 }

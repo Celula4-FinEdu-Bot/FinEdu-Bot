@@ -9,6 +9,35 @@ using src.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================================
+// CONFIGURACIÓN (JSON + User Secrets + Env Vars)
+// Orden de precedencia (último gana):
+//   appsettings.json < appsettings.{Env}.json < User Secrets < Env Vars
+// ============================================================
+
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json",
+                 optional: true, reloadOnChange: true);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true);
+}
+
+builder.Configuration.AddEnvironmentVariables();
+
+// Validación temprana: falla rápido si falta la cadena de conexión
+var connStringPreview = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connStringPreview))
+{
+    throw new InvalidOperationException(
+        "Falta ConnectionStrings:DefaultConnection. " +
+        "En desarrollo usa 'dotnet user-secrets set'. " +
+        "En producción configura la variable de entorno 'ConnectionStrings__DefaultConnection'.");
+}
+
+
+// ============================================================
 // RAZOR COMPONENTS
 // ============================================================
 
@@ -51,6 +80,7 @@ builder.Services.AddScoped<MefService>();
 builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
+builder.Services.AddScoped<OeceBackendService>();
 
 var app = builder.Build();
 
