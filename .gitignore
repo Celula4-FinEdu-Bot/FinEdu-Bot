@@ -110,3 +110,10 @@ artifacts/
 
 *.tmp
 *.temp
+
+# ============================================================
+# Local secrets / backups - no subir
+# ============================================================
+
+src/database/migrations/connection.txt
+*.bak
