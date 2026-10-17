@@ -1,9 +1,10 @@
 
 using System.Security.Claims;
-
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
+
 using Microsoft.AspNetCore.HttpOverrides;
 
 using Npgsql;
@@ -127,6 +128,21 @@ builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
 builder.Services.AddScoped<OeceBackendService>();
+
+
+var dataProtectionPath =
+    Environment.GetEnvironmentVariable("DATA_PROTECTION_PATH");
+
+if (!string.IsNullOrWhiteSpace(dataProtectionPath))
+{
+    Directory.CreateDirectory(dataProtectionPath);
+
+    builder.Services
+        .AddDataProtection()
+        .SetApplicationName("FinEduBot")
+        .PersistKeysToFileSystem(
+            new DirectoryInfo(dataProtectionPath));
+}
 
 var app = builder.Build();
 
