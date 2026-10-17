@@ -46,7 +46,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services
     .AddDataProtection()
-    .SetApplicationName("FinEduBot");
+    .SetApplicationName("FinEduBot")
+    .UseEphemeralDataProtectionProvider();
 
 // ============================================================
 // PROXY INVERSO DE RENDER
@@ -142,7 +143,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
 
