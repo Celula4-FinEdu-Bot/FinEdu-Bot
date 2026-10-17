@@ -177,7 +177,8 @@ app.UseAntiforgery();
 
 app.MapPost("/account/login", async (
     HttpContext httpContext,
-    IConfiguration configuration) =>
+    IConfiguration configuration,
+    ILogger<Program> logger) =>
 {
     var form = await httpContext.Request.ReadFormAsync();
 
@@ -190,55 +191,47 @@ app.MapPost("/account/login", async (
         return Results.Redirect("/login?error=1");
     }
 
-    var loginConnectionString =
-        configuration.GetConnectionString("DefaultConnection");
-
-    if (string.IsNullOrWhiteSpace(loginConnectionString))
+    try
     {
-        return Results.Problem(
-            "No se encontró ConnectionStrings:DefaultConnection");
+        var loginConnectionString =
+            configuration.GetConnectionString("DefaultConnection");
+
+        await using var connection = new NpgsqlConnection(loginConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            "SELECT * FROM authenticate_app_user($1, $2)", connection);
+        command.Parameters.AddWithValue(username);
+        command.Parameters.AddWithValue(password);
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+        {
+            logger.LogWarning("Login fallido: sin filas para el usuario {User}", username);
+            return Results.Redirect("/login?error=1");
+        }
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, reader.GetInt32(0).ToString()),
+            new(ClaimTypes.Name, reader.GetString(1)),
+            new("FullName", reader.GetString(2)),
+            new(ClaimTypes.Role, reader.GetString(3)),
+            new("RoleName", reader.GetString(4))
+        };
+
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "FinEduCookie"));
+        await httpContext.SignInAsync("FinEduCookie", principal);
+
+        logger.LogInformation("Login correcto: {User}", username);
+        return Results.Redirect("/");
     }
-
-    await using var connection =
-        new NpgsqlConnection(loginConnectionString);
-
-    await connection.OpenAsync();
-
-    await using var command = new NpgsqlCommand(
-        "SELECT * FROM authenticate_app_user($1, $2)",
-        connection);
-
-    command.Parameters.AddWithValue(username);
-    command.Parameters.AddWithValue(password);
-
-    await using var reader = await command.ExecuteReaderAsync();
-
-    if (!await reader.ReadAsync())
+    catch (Exception ex)
     {
-        return Results.Redirect("/login?error=1");
+        logger.LogError(ex, "Error en login para {User}", username);
+        return Results.Redirect("/login?error=2");
     }
-
-    var userId = reader.GetInt32(0);
-    var dbUsername = reader.GetString(1);
-    var fullName = reader.GetString(2);
-    var roleCode = reader.GetString(3);
-    var roleName = reader.GetString(4);
-
-    var claims = new List<Claim>
-    {
-        new(ClaimTypes.NameIdentifier, userId.ToString()),
-        new(ClaimTypes.Name, dbUsername),
-        new("FullName", fullName),
-        new(ClaimTypes.Role, roleCode),
-        new("RoleName", roleName)
-    };
-
-    var identity = new ClaimsIdentity(claims, "FinEduCookie");
-    var principal = new ClaimsPrincipal(identity);
-
-    await httpContext.SignInAsync("FinEduCookie", principal);
-
-    return Results.Redirect("/");
 });
 
 // ============================================================
