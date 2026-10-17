@@ -183,6 +183,7 @@ app.MapPost("/account/login", async (
     var form = await httpContext.Request.ReadFormAsync();
 
     var username = form["username"].ToString().Trim();
+    var usernameForLog = username.Replace("\r", "").Replace("\n", "");
     var password = form["password"].ToString();
 
     if (string.IsNullOrWhiteSpace(username) ||
@@ -208,7 +209,7 @@ app.MapPost("/account/login", async (
 
         if (!await reader.ReadAsync())
         {
-            logger.LogWarning("Login fallido: sin filas para el usuario {User}", username);
+            logger.LogWarning("Login fallido: sin filas para el usuario {User}", usernameForLog);
             return Results.Redirect("/login?error=1");
         }
 
@@ -224,12 +225,12 @@ app.MapPost("/account/login", async (
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "FinEduCookie"));
         await httpContext.SignInAsync("FinEduCookie", principal);
 
-        logger.LogInformation("Login correcto: {User}", username);
+        logger.LogInformation("Login correcto: {User}", usernameForLog);
         return Results.Redirect("/");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Error en login para {User}", username);
+        logger.LogError(ex, "Error en login para {User}", usernameForLog);
         return Results.Redirect("/login?error=2");
     }
 });
