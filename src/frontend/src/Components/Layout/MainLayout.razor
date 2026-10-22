@@ -1,0 +1,87 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inherits LayoutComponentBase
+
+<AuthorizeView>
+
+    <Authorized>
+
+        <div class="app-shell">
+
+            <aside class="sidebar">
+
+                <NavMenu />
+
+            </aside>
+
+            <main class="main-content">
+
+                <header class="topbar">
+
+                    <div class="topbar-title-group">
+
+                        <span class="topbar-title">
+                            Monitor de Transparencia
+                        </span>
+
+                        <span class="topbar-subtitle">
+                            FinEdu-Bot
+                        </span>
+
+                    </div>
+
+                    <div class="topbar-user">
+
+                        <div class="user-info">
+
+                            <strong>
+                                @context.User.FindFirst("FullName")?.Value
+                            </strong>
+
+                            <span>
+                                @context.User.FindFirst(
+                                    "RoleName")?.Value
+                            </span>
+
+                        </div>
+
+                        <div class="user-avatar">
+                            @(
+                                context.User.Identity?.Name?
+                                    .Substring(0, 1)
+                                    .ToUpper()
+                                ?? "U"
+                            )
+                        </div>
+
+                        <form
+                            method="post"
+                            action="/account/logout"
+                            data-enhance="false">
+
+                            <button
+                                type="submit"
+                                class="logout-button">
+
+                                Salir
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </header>
+
+                <section class="content">
+
+                    @Body
+
+                </section>
+
+            </main>
+
+        </div>
+
+    </Authorized>
+
+</AuthorizeView>

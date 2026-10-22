@@ -1,0 +1,340 @@
+@page "/contrataciones"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Globalization
+@using System.Text.Json
+@using src.Models
+@using src.Services
+@inject OeceBackendService OeceBackendService
+
+<PageTitle>Contrataciones | FinEdu-Bot</PageTitle>
+
+<div class="oece-page">
+    <header class="oece-heading">
+        <span class="eyebrow">MICROFRONTEND OECE</span>
+        <h1>Explorador de contrataciones</h1>
+        <p class="subtitle">
+            Consulta en lenguaje natural las contrataciones públicas de 2018.
+            Tu pregunta se procesa mediante el backend Node.js y el workflow OECE de n8n.
+        </p>
+    </header>
+
+    <section class="query-card">
+        <div class="query-header">
+            <div>
+                <span class="section-label">OECE / CONTRATACIONES 2018</span>
+                <h2>¿Qué deseas consultar?</h2>
+            </div>
+            <span class="source-badge">OECE</span>
+        </div>
+
+        <form class="query-form" @onsubmit="BuscarAsync" @onsubmit:preventDefault>
+            <input class="query-input"
+                   @bind="Texto"
+                   @bind:event="oninput"
+                   placeholder="Ej. ¿Qué contratos obtuvo una empresa durante 2018?"
+                   disabled="@Cargando" />
+            <button type="submit" class="query-button" disabled="@Cargando">
+                @if (Cargando)
+                {
+                    <span class="spinner"></span><span>Consultando...</span>
+                }
+                else
+                {
+                    <span>Consultar</span>
+                }
+            </button>
+        </form>
+
+        <div class="filters-grid">
+            <div class="filter-field">
+                <label for="oece-anio">Año</label>
+                <select id="oece-anio" @bind="Anio" disabled="@Cargando">
+                    <option value="2018">2018</option>
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="oece-departamento">Departamento</label>
+                <input id="oece-departamento" @bind="Departamento" placeholder="Ej. LIMA" disabled="@Cargando" />
+            </div>
+            <div class="filter-field">
+                <label for="oece-entidad">Entidad</label>
+                <input id="oece-entidad" @bind="Entidad" placeholder="Ej. SUNAT" disabled="@Cargando" />
+            </div>
+            <div class="filter-field">
+                <label for="oece-proceso">Tipo de proceso</label>
+                <input id="oece-proceso" @bind="TipoProceso" placeholder="Ej. Adjudicación Simplificada" disabled="@Cargando" />
+            </div>
+            <div class="filter-field">
+                <label for="oece-objeto">Objeto contractual</label>
+                <input id="oece-objeto" @bind="ObjetoContractual" placeholder="Ej. Bien, servicio u obra" disabled="@Cargando" />
+            </div>
+            <div class="filter-field">
+                <label for="oece-mes">Mes</label>
+                <select id="oece-mes" @bind="Mes" disabled="@Cargando">
+                    <option value="">Todos</option>
+                    @for (var mes = 1; mes <= 12; mes++)
+                    {
+                        <option value="@mes">@GetMonthName(mes)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="examples">
+            <span class="examples-title">Ejemplos:</span>
+            <button type="button" class="example-button" @onclick='() => UsarEjemploAsync("¿Qué contrataciones tuvo la Municipalidad Distrital de Chambara en 2018?")' disabled="@Cargando">Municipalidad de Chambara</button>
+            <button type="button" class="example-button" @onclick='() => UsarEjemploAsync("¿Qué contratos tuvo la Fuerza Aérea del Perú en 2018?")' disabled="@Cargando">Fuerza Aérea del Perú</button>
+            <button type="button" class="example-button" @onclick='() => UsarEjemploAsync("¿Qué empresas participaron como ofertantes en procesos de 2018?")' disabled="@Cargando">Listado de ofertantes</button>
+            <button type="button" class="example-button" @onclick='() => UsarEjemploAsync("¿Qué órdenes de compra y servicio se registraron en 2018?")' disabled="@Cargando">Órdenes de compra y servicio</button>
+            <button type="button" class="example-button" @onclick='() => UsarEjemploAsync("¿Qué procesos fueron declarados nulos o desiertos en 2018?")' disabled="@Cargando">Procesos nulos o desiertos</button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="error-message" role="alert">
+                <strong>No se pudo completar la consulta</strong>
+                <p>@Error</p>
+            </div>
+        }
+
+        @if (Cargando)
+        {
+            <div class="loading-message"><span class="spinner spinner-blue"></span><span>Procesando la pregunta y buscando registros en OECE...</span></div>
+        }
+
+        @if (Resultado is not null)
+        {
+            <section class="response-panel" aria-live="polite">
+                <div class="response-heading">
+                    <div>
+                        <span class="section-label">RESPUESTA OECE</span>
+                        <h3>@(Resultado.Success ? "Resultado de la consulta" : "Consulta no completada")</h3>
+                    </div>
+                    @if (Resultado.FallbackUsed)
+                    {
+                        <span class="fallback-badge">Se utilizó manejo alternativo</span>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Resultado.Message))
+                {
+                    <p class="response-message">@Resultado.Message</p>
+                }
+
+                @if (Resultado.Success)
+                {
+                    <div class="summary-grid">
+                        <div class="summary-card"><span class="summary-label">COINCIDENCIAS</span><strong class="summary-value">@TotalRegistros</strong></div>
+                        <div class="summary-card"><span class="summary-label">REGISTROS DEVUELTOS</span><strong class="summary-value">@Resultado.Records.Count</strong></div>
+                        <div class="summary-card"><span class="summary-label">FUENTE</span><strong class="summary-source">@(Resultado.Source ?? "OECE")</strong></div>
+                    </div>
+
+                    @if (Resultado.Records.Count > 0)
+                    {
+                        var columnas = GetColumns(Resultado.Records[0]);
+                        <div class="results-container">
+                            <div class="results-header">
+                                <div><span class="section-label">REGISTROS RECUPERADOS</span><h3>Detalle de contrataciones</h3></div>
+                                <span class="result-count">@Resultado.Records.Count registro(s)</span>
+                            </div>
+                            @if (columnas.Count > 0)
+                            {
+                                <div class="table-wrapper">
+                                    <table class="results-table">
+                                        <thead><tr>@foreach (var columna in columnas) { <th>@FormatColumnName(columna)</th> }</tr></thead>
+                                        <tbody>
+                                            @foreach (var registro in Resultado.Records)
+                                            {
+                                                <tr>
+                                                    @foreach (var columna in columnas)
+                                                    {
+                                                        <td>@GetDisplayValue(registro, columna)</td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="empty-message">La respuesta contiene registros, pero no tiene estructura tabular.</p>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-results">
+                            <div class="no-results-icon">i</div>
+                            <div><h3>No se encontraron registros</h3><p>Prueba con el RUC, el nombre completo de la entidad o el código de convocatoria.</p></div>
+                        </div>
+                    }
+                }
+            </section>
+        }
+    </section>
+</div>
+
+<style>
+    .oece-page { min-height: 100%; padding: 32px clamp(16px,4vw,48px); background: #f4f7fb; color: #102a56; }
+    .oece-heading { max-width: 1320px; margin: 0 auto 24px; }
+    .eyebrow,.section-label { color: #2563eb; font-size: 12px; font-weight: 800; letter-spacing: 1.4px; }
+    .oece-heading h1 { margin: 8px 0; font-size: clamp(28px,3vw,38px); font-weight: 750; }
+    .subtitle { max-width: 850px; color: #52627a; line-height: 1.6; }
+    .query-card { max-width: 1320px; margin: 0 auto; padding: clamp(18px,3vw,30px); background: white; border: 1px solid #dce3ee; border-radius: 18px; box-shadow: 0 8px 24px rgba(15,23,42,.05); }
+    .query-header,.response-heading,.results-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .query-header { margin-bottom: 22px; } .query-header h2 { margin: 7px 0 0; font-size: 25px; }
+    .source-badge,.fallback-badge,.result-count { display: inline-flex; align-items: center; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 750; background: #eff6ff; color: #1d4ed8; white-space: nowrap; }
+    .fallback-badge { background: #fff7ed; color: #9a3412; }
+    .query-form { display: flex; gap: 10px; }
+    .query-input { min-width: 0; flex: 1; height: 52px; border: 1px solid #d1dced; border-radius: 10px; padding: 0 16px; color: #0f172a; font-size: 15px; outline: none; }
+    .query-input:focus,.filter-field input:focus,.filter-field select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .query-button { min-width: 130px; height: 52px; border: 0; border-radius: 10px; padding: 0 22px; background: #2563eb; color: white; font-weight: 750; cursor: pointer; }
+    .query-button:disabled,.example-button:disabled { opacity: .65; cursor: not-allowed; }
+    .filters-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 15px; margin-top: 22px; }
+    .filter-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+    .filter-field label { color: #475569; font-size: 12px; font-weight: 750; }
+    .filter-field input,.filter-field select { width: 100%; min-width: 0; height: 42px; border: 1px solid #d6deeb; border-radius: 8px; padding: 0 10px; background: white; color: #334155; }
+    .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
+    .examples-title { color: #64748b; font-size: 13px; }
+    .example-button { border: 1px solid #dbe3ef; background: #f8fafc; color: #334155; border-radius: 8px; padding: 8px 11px; cursor: pointer; font-size: 12px; }
+    .example-button:hover { border-color: #93c5fd; background: #eff6ff; }
+    .error-message,.no-results,.loading-message,.response-message,.empty-message { margin-top: 18px; padding: 14px 16px; border-radius: 10px; line-height: 1.5; }
+    .error-message { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; } .error-message p { margin: 4px 0 0; }
+    .loading-message { display: flex; align-items: center; gap: 10px; background: #eff6ff; color: #1e40af; }
+    .response-panel { margin-top: 28px; padding-top: 22px; border-top: 1px solid #e2e8f0; }
+    .response-heading h3,.results-header h3 { margin: 6px 0 0; font-size: 21px; }
+    .response-message { background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-top: 18px; }
+    .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 17px; }
+    .summary-label { display: block; font-size: 11px; color: #64748b; margin-bottom: 8px; }
+    .summary-value { display: block; font-size: 25px; color: #102a56; } .summary-source { display: block; color: #2563eb; overflow-wrap: anywhere; }
+    .results-container { margin-top: 22px; border: 1px solid #e2e8f0; border-radius: 13px; overflow: hidden; }
+    .results-header { padding: 18px 20px; border-bottom: 1px solid #e2e8f0; }
+    .table-wrapper { width: 100%; max-height: 620px; overflow: auto; }
+    .results-table { width: 100%; min-width: 1050px; border-collapse: separate; border-spacing: 0; }
+    .results-table th { position: sticky; top: 0; z-index: 1; background: #f1f5f9; color: #475569; text-align: left; font-size: 11px; font-weight: 800; padding: 13px; border-bottom: 1px solid #dbe3ef; white-space: nowrap; }
+    .results-table td { padding: 12px 13px; border-bottom: 1px solid #edf2f7; color: #334155; font-size: 12px; vertical-align: top; max-width: 360px; overflow-wrap: anywhere; }
+    .results-table tbody tr:nth-child(even) { background: #fbfdff; } .results-table tbody tr:hover { background: #eff6ff; }
+    .no-results { display: flex; align-items: flex-start; gap: 13px; background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+    .no-results-icon { display: flex; flex: 0 0 32px; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 50%; background: #f59e0b; color: white; font-weight: 800; }
+    .no-results h3 { margin: 0 0 5px; font-size: 17px; } .no-results p { margin: 0; } .empty-message { color: #64748b; background: #f8fafc; }
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.45); border-top-color: white; border-radius: 50%; animation: spin .8s linear infinite; margin-right: 7px; }
+    .spinner-blue { border-color: #bfdbfe; border-top-color: #2563eb; }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+    @@media (max-width: 900px) { .filters-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @@media (max-width: 600px) { .query-form { flex-direction: column; } .query-button { width: 100%; } .filters-grid,.summary-grid { grid-template-columns: 1fr; } .response-heading,.results-header { align-items: flex-start; flex-direction: column; } .oece-page { padding: 20px 12px; } .query-card { padding: 16px; } }
+</style>
+
+@code {
+    private string Texto = "";
+    private string Anio = "2018";
+    private string Departamento = "";
+    private string Entidad = "";
+    private string TipoProceso = "";
+    private string ObjetoContractual = "";
+    private string Mes = "";
+    private bool Cargando;
+    private string Error = "";
+    private OeceNlqResponse? Resultado;
+    private readonly string SessionId = Guid.NewGuid().ToString("N");
+
+    private int TotalRegistros => Resultado is null ? 0 :
+        Resultado.Total > 0 ? Resultado.Total : Resultado.Records.Count;
+
+    private async Task BuscarAsync()
+    {
+        if (Cargando) return;
+        if (string.IsNullOrWhiteSpace(Texto) &&
+            string.IsNullOrWhiteSpace(Departamento) &&
+            string.IsNullOrWhiteSpace(Entidad) &&
+            string.IsNullOrWhiteSpace(TipoProceso) &&
+            string.IsNullOrWhiteSpace(ObjetoContractual))
+        {
+            Error = "Escribe una pregunta o completa al menos un filtro.";
+            Resultado = null;
+            return;
+        }
+
+        Cargando = true;
+        Error = "";
+        Resultado = null;
+        try
+        {
+            Resultado = await OeceBackendService.ConsultarAsync(
+                ConstruirPregunta(), SessionId, CancellationToken.None);
+            if (!Resultado.Success)
+                Error = Resultado.Message ?? "No se pudo completar la consulta OECE.";
+        }
+        catch
+        {
+            Error = "Ocurrió un error al procesar la consulta OECE. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            Cargando = false;
+        }
+    }
+
+    private string ConstruirPregunta()
+    {
+        var pregunta = string.IsNullOrWhiteSpace(Texto)
+            ? "Consulta de contrataciones públicas"
+            : Texto.Trim();
+        var filtros = new List<string>();
+        if (!string.IsNullOrWhiteSpace(Anio)) filtros.Add("año = " + Anio);
+        if (!string.IsNullOrWhiteSpace(Departamento)) filtros.Add("departamento contiene " + Departamento.Trim());
+        if (!string.IsNullOrWhiteSpace(Entidad)) filtros.Add("entidad contiene " + Entidad.Trim());
+        if (!string.IsNullOrWhiteSpace(TipoProceso)) filtros.Add("tipo de proceso contiene " + TipoProceso.Trim());
+        if (!string.IsNullOrWhiteSpace(ObjetoContractual)) filtros.Add("objeto contractual contiene " + ObjetoContractual.Trim());
+        if (int.TryParse(Mes, out var mes) && mes is >= 1 and <= 12) filtros.Add("mes = " + GetMonthName(mes));
+        if (filtros.Count > 0)
+            pregunta += "\n\nAplica obligatoriamente estos filtros en la consulta: " + string.Join("; ", filtros) + ".";
+        return pregunta;
+    }
+
+    private async Task UsarEjemploAsync(string ejemplo)
+    {
+        Texto = ejemplo;
+        Anio = "2018";
+        await BuscarAsync();
+    }
+
+    private static List<string> GetColumns(JsonElement record) =>
+        record.ValueKind == JsonValueKind.Object
+            ? record.EnumerateObject().Select(p => p.Name).ToList()
+            : [];
+
+    private static string GetDisplayValue(JsonElement record, string column)
+    {
+        if (record.ValueKind != JsonValueKind.Object || !record.TryGetProperty(column, out var value))
+            return "-";
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => string.IsNullOrWhiteSpace(value.GetString()) ? "-" : value.GetString()!,
+            JsonValueKind.Number when IsAmountColumn(column) && value.TryGetDecimal(out var amount) =>
+                amount.ToString("N2", CultureInfo.GetCultureInfo("es-PE")),
+            JsonValueKind.Number => value.GetRawText(),
+            JsonValueKind.True => "Sí",
+            JsonValueKind.False => "No",
+            JsonValueKind.Null or JsonValueKind.Undefined => "-",
+            _ => value.ToString()
+        };
+    }
+
+    private static bool IsAmountColumn(string column)
+    {
+        var name = column.ToLowerInvariant();
+        return name.Contains("monto") || name.Contains("importe") || name.Contains("precio") ||
+               name.Contains("valor") || name.Contains("cantidad_adjudicado") || name.Contains("plazo");
+    }
+
+    private static string FormatColumnName(string column) =>
+        string.Join(" ", column.Replace("_", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+
+    private static string GetMonthName(int month) =>
+        CultureInfo.GetCultureInfo("es-PE").DateTimeFormat.GetMonthName(month);
+}

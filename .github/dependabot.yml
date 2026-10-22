@@ -1,0 +1,102 @@
+# ============================================================
+# Dependabot - SCA continuo (Software Composition Analysis)
+# Ubicacion en el repo: .github/dependabot.yml
+# ============================================================
+# Complementa a dependency-review-action:
+#   - dependency-review  -> revisa dependencias NUEVAS en cada PR
+#   - dependabot         -> revisa dependencias YA MERGEADAS, de forma
+#                           continua, y abre PRs de actualizacion
+# ============================================================
+# IMPORTANTE: verificar que los "directory" coincidan con la estructura
+# real del repo antes de commitear. Si una ruta no existe, Dependabot
+# la ignora en silencio y creeras que esta cubierta cuando no lo esta.
+# ============================================================
+
+version: 2
+
+updates:
+  # ----------------------------------------------------------
+  # 1. GitHub Actions - los propios workflows del repo
+  # Las actions desactualizadas son un vector real de supply chain.
+  # ----------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "devsecops"
+    commit-message:
+      prefix: "chore(ci)"
+
+  # ----------------------------------------------------------
+  # 2. Backend - Node.js / TypeScript / Express
+  # ----------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/finedu-bot-backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "backend"
+    commit-message:
+      prefix: "chore(backend)"
+    groups:
+      # Agrupa los parches menores en un solo PR para no saturar al equipo.
+      actualizaciones-menores:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ----------------------------------------------------------
+  # 3. Frontend - .NET 9 / Blazor (NuGet)
+  # ----------------------------------------------------------
+  - package-ecosystem: "nuget"
+    directory: "/src/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "frontend"
+    commit-message:
+      prefix: "chore(frontend)"
+    groups:
+      actualizaciones-menores:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ----------------------------------------------------------
+  # 4. IA Ops - Python (pytest, requests, pydantic, SDKs de LLM)
+  # Solo aplica si existe src/ia-ops/requirements.txt
+  # ----------------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/src/ia-ops"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+      - "ia-ops"
+    commit-message:
+      prefix: "chore(ia-ops)"
+    groups:
+      actualizaciones-menores:
+        update-types:
+          - "minor"
+          - "patch"

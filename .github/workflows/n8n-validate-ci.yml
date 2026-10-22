@@ -1,0 +1,77 @@
+name: Validar JSONs de n8n
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/n8n-workflows/**"
+      - ".github/workflows/n8n-validate-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-json:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Validar sintaxis JSON
+        shell: bash
+        run: |
+          echo "Validando archivos JSON de n8n..."
+
+          error_found=0
+          file_found=0
+
+          while IFS= read -r -d '' file; do
+            file_found=1
+
+            if python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "OK: $file"
+            else
+              echo "JSON invalido: $file"
+              error_found=1
+            fi
+          done < <(
+            find src/n8n-workflows/production src/n8n-workflows/templates \
+              -type f -name "*.json" -print0 2>/dev/null
+          )
+
+          if [ "$file_found" -eq 0 ]; then
+            echo "Aun no hay flujos JSON. Se omite validacion."
+            exit 0
+          fi
+
+          if [ "$error_found" -eq 1 ]; then
+            echo "Se encontraron archivos JSON invalidos."
+            exit 1
+          fi
+
+          echo "Todos los archivos JSON son validos."
+
+      - name: Buscar credenciales quemadas en los flujos JSON
+        run: |
+          echo "Buscando patrones de credenciales expuestas..."
+          FILES=$(find src/n8n-workflows/production src/n8n-workflows/templates -name "*.json" 2>/dev/null || true)
+          if [ -z "$FILES" ]; then
+            echo "Aun no hay flujos JSON. Se omite escaneo de credenciales."
+            exit 0
+          fi
+          PATTERN='(api[_-]?key|apikey|secret|password|passwd|token|bearer|authorization)["\x27]?\s*[:=]\s*["\x27][A-Za-z0-9_\-]{8,}'
+          found=0
+          for file in $FILES; do
+            if grep -Eio "$PATTERN" "$file" > /dev/null; then
+              echo "Posible credencial quemada en: $file"
+              grep -Eino "$PATTERN" "$file"
+              found=1
+            fi
+          done
+          if [ $found -eq 1 ]; then
+            echo "Se encontraron posibles credenciales expuestas. Revisa el flujo y usa credenciales de n8n (Credentials) en vez de valores literales."
+            exit 1
+          fi
+          echo "No se encontraron credenciales quemadas."
