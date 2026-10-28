@@ -1,0 +1,38 @@
+name: Gitleaks Secret Scan
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - HU-48
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Detect secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+
+      - name: Install Gitleaks CLI
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+
+      - name: Add Go binaries to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Scan repository history
+        run: gitleaks git --redact --verbose
