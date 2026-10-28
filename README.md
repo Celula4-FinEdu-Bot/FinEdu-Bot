@@ -71,7 +71,11 @@ PORT=3000
 API_PREFIX=/api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/finedu_bot
 N8N_WEBHOOK_URL=http://localhost:5678/webhook
+N8N_WEBHOOK_AUTH_HEADER=X-Api-Key
+N8N_WEBHOOK_AUTH_SECRET=<secreto-generado-con-openssl-rand-hex-32>
 ```
+
+**Autenticación de servicio (HU-44):** el Webhook del chat en n8n (`ai-agent-orchestrator`) usa Header Auth. El backend Express envía la cabecera `N8N_WEBHOOK_AUTH_HEADER` con el valor de `N8N_WEBHOOK_AUTH_SECRET` en cada petición, y n8n la valida antes de ejecutar el flujo. El secreto se genera con `openssl rand -hex 32`, se guarda solo en el `.env` (que no se sube al repo) y debe coincidir con la credencial Header Auth configurada en n8n.
 
 Levantar el servidor:
 
