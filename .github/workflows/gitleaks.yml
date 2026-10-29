@@ -43,6 +43,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          test_dir="$RUNNER_TEMP/ca03-test"
+          mkdir -p "$test_dir"
+
           cat > "$RUNNER_TEMP/gitleaks-test.toml" <<'EOF'
           title = "CA-03 Controlled Test"
 
@@ -54,14 +57,38 @@ jobs:
           keywords = ["CA03_CANARY_"]
           EOF
 
+          printf '%s\n' 'CA03_CANARY_ABCDEF1234567890' > "$test_dir/canary.txt"
+          report="$RUNNER_TEMP/ca03-report.json"
+          trap 'rm -rf "$test_dir" "$report"' EXIT
+
           set +e
-          printf '%s\n' 'CA03_CANARY_ABCDEF1234567890' | gitleaks stdin --config "$RUNNER_TEMP/gitleaks-test.toml" --redact --exit-code 1
+          gitleaks dir "$test_dir" \
+            --config "$RUNNER_TEMP/gitleaks-test.toml" \
+            --redact \
+            --report-format json \
+            --report-path "$report" \
+            --exit-code 1
           result=$?
           set -e
 
-          if [ "$result" -eq 1 ]; then
-            echo "CA-03 OK: Gitleaks detected the canary."
-          else
-            echo "CA-03 ERROR: expected exit code 1, got $result."
+          if [ "$result" -ne 1 ]; then
+            echo "CA-03 ERROR: expected detection exit code 1, got $result."
             exit 1
           fi
+
+          python3 - "$report" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as f:
+              findings = json.load(f)
+
+          if not any(
+              finding.get("RuleID") == "ca03-test-canary"
+              for finding in findings
+          ):
+              print("CA-03 ERROR: expected rule was not found in the report.")
+              sys.exit(1)
+
+          print("CA-03 OK: Gitleaks detected the canary file with the expected rule.")
+          PY
