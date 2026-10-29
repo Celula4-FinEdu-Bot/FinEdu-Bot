@@ -1,3 +1,4 @@
+
 name: Gitleaks Secret Scan
 
 on:
@@ -34,5 +35,33 @@ jobs:
       - name: Add Go binaries to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Scan repository history
-        run: gitleaks git --redact --verbose
+      - name: Scan current files
+        run: gitleaks dir . --redact --verbose
+
+      - name: Validate controlled detection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > "$RUNNER_TEMP/gitleaks-test.toml" <<'EOF'
+          title = "CA-03 Controlled Test"
+
+          [[rules]]
+          id = "ca03-test-canary"
+          description = "Detects the fictitious CA-03 canary"
+          regex = '''CA03_CANARY_[A-Z0-9]{16}'''
+          secretGroup = 0
+          keywords = ["CA03_CANARY_"]
+          EOF
+
+          set +e
+          printf '%s\n' 'CA03_CANARY_ABCDEF1234567890' | gitleaks stdin --config "$RUNNER_TEMP/gitleaks-test.toml" --redact --exit-code 1
+          result=$?
+          set -e
+
+          if [ "$result" -eq 1 ]; then
+            echo "CA-03 OK: Gitleaks detected the canary."
+          else
+            echo "CA-03 ERROR: expected exit code 1, got $result."
+            exit 1
+          fi
