@@ -2,6 +2,10 @@
 .SYNOPSIS
     Prueba manual de autorización por rol (HU-40) contra el frontend en ejecución.
 
+.DESCRIPTION
+    Solo prueba rutas de página Blazor. Los controladores /api no están mapeados
+    (no hay AddControllers/MapControllers en Program.cs), así que no se prueban aquí.
+
 .EXAMPLE
     .\probar-autorizacion.ps1 -AdminUser admin -NormalUser usuario
     .\probar-autorizacion.ps1 -BaseUrl https://localhost:5001 -AdminUser admin -NormalUser usuario
@@ -23,7 +27,16 @@ function ConvertTo-PlainText([Security.SecureString]$Secure) {
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
 }
 
-# Devuelve @{ Status; Body } aunque la respuesta sea 3xx/4xx/5xx.
+# Lee la cabecera Location tanto en Windows PowerShell 5.1 como en PowerShell 7.
+function Get-LocationHeader($Resp) {
+    if ($null -eq $Resp) { return '' }
+    if ($Resp -is [System.Net.HttpWebResponse]) { return [string]$Resp.Headers['Location'] }
+    if ($Resp.Headers -and $Resp.Headers.Location) { return [string]$Resp.Headers.Location }
+    if ($Resp.Headers -and $Resp.Headers['Location']) { return [string]($Resp.Headers['Location'] | Select-Object -First 1) }
+    return ''
+}
+
+# Devuelve @{ Status; Location; Body } aunque la respuesta sea 3xx/4xx/5xx.
 function Invoke-Probe {
     param(
         [string]$Method = 'GET',
@@ -38,7 +51,10 @@ function Invoke-Probe {
         Uri             = "$BaseUrl$Path"
         Method          = $Method
         UseBasicParsing = $true
-        ErrorAction     = 'Stop'
+        # En PowerShell 5.1, un 3xx con MaximumRedirection 0 es un error no terminante que
+        # igual devuelve la respuesta; con 'Stop' se perdería el código y la cabecera Location.
+        ErrorAction     = 'SilentlyContinue'
+        ErrorVariable   = 'probeError'
     }
     if ($Session) { $params.WebSession = $Session }
     if ($null -ne $Body) { $params.Body = $Body }
@@ -47,24 +63,33 @@ function Invoke-Probe {
 
     try {
         $r = Invoke-WebRequest @params
-        return @{ Status = [int]$r.StatusCode; Body = [string]$r.Content }
     }
     catch {
-        $resp = $_.Exception.Response
-        if ($null -eq $resp) { return @{ Status = 0; Body = $_.Exception.Message } }
-
-        $body = ''
-        if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
-            $body = $_.ErrorDetails.Message
-        }
-        elseif ($resp -is [System.Net.HttpWebResponse]) {
-            try {
-                $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
-                $body = $reader.ReadToEnd()
-            } catch { }
-        }
-        return @{ Status = [int]$resp.StatusCode; Body = $body }
+        $probeError = @($_)
     }
+
+    if ($null -ne $r) {
+        return @{ Status = [int]$r.StatusCode; Location = (Get-LocationHeader $r); Body = [string]$r.Content }
+    }
+
+    $err = $probeError | Select-Object -First 1
+    $resp = if ($err) { $err.Exception.Response } else { $null }
+    if ($null -eq $resp) {
+        $msg = if ($err) { $err.Exception.Message } else { 'sin respuesta' }
+        return @{ Status = 0; Location = ''; Body = $msg }
+    }
+
+    $body = ''
+    if ($err.ErrorDetails -and $err.ErrorDetails.Message) {
+        $body = $err.ErrorDetails.Message
+    }
+    elseif ($resp -is [System.Net.HttpWebResponse]) {
+        try {
+            $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+            $body = $reader.ReadToEnd()
+        } catch { }
+    }
+    return @{ Status = [int]$resp.StatusCode; Location = (Get-LocationHeader $resp); Body = $body }
 }
 
 function Write-Resultado([string]$Caso, [bool]$Ok, [string]$Detalle) {
@@ -77,21 +102,24 @@ function Write-Resultado([string]$Caso, [bool]$Ok, [string]$Detalle) {
     }
 }
 
-function Test-Status([string]$Caso, $Res, [int]$Esperado) {
-    Write-Resultado $Caso ($Res.Status -eq $Esperado) "esperado $Esperado, obtenido $($Res.Status)"
+function Format-Obtenido($Res) {
+    $loc = if ($Res.Location) { $Res.Location } else { '(sin Location)' }
+    return "obtenido $($Res.Status), Location: $loc"
 }
 
-function Test-Permitido([string]$Caso, $Res) {
-    # 404 significa que la ruta no existe, así que tampoco cuenta como acceso permitido.
-    $ok = $Res.Status -ne 0 -and $Res.Status -notin 401, 403, 404
-    Write-Resultado $Caso $ok "esperado distinto de 401/403, obtenido $($Res.Status)"
+function Test-Redireccion([string]$Caso, $Res, [string]$Destino) {
+    $ok = $Res.Status -eq 302 -and $Res.Location -like "*$Destino*"
+    Write-Resultado $Caso $ok "esperado 302 hacia $Destino, $(Format-Obtenido $Res)"
 }
 
-function Test-Html([string]$Caso, $Res, [bool]$DebeContener) {
-    $contiene = $Res.Body -match 'Acceso denegado'
-    $esperado = if ($DebeContener) { 'contiene' } else { 'no contiene' }
+function Test-Ok200([string]$Caso, $Res) {
+    Write-Resultado $Caso ($Res.Status -eq 200) "esperado 200, $(Format-Obtenido $Res)"
+}
+
+function Test-Html([string]$Caso, $Res, [string]$Texto) {
+    $contiene = $Res.Body -match [regex]::Escape($Texto)
     $obtenido = if ($contiene) { 'contiene' } else { 'no contiene' }
-    Write-Resultado $Caso ($contiene -eq $DebeContener) "esperado '$esperado Acceso denegado', obtenido '$obtenido' (HTTP $($Res.Status))"
+    Write-Resultado $Caso $contiene "esperado que contenga '$Texto', obtenido '$obtenido' (HTTP $($Res.Status))"
 }
 
 function New-SesionAutenticada([string]$Usuario, [Security.SecureString]$Clave) {
@@ -110,20 +138,19 @@ $adminPass = Read-Host "Contraseña de $AdminUser (ADMIN)" -AsSecureString
 $userPass = Read-Host "Contraseña de $NormalUser (USER)" -AsSecureString
 
 Write-Host "`n== Sin sesión ($BaseUrl)" -ForegroundColor Cyan
-Test-Status 'GET /api/mef/total' (Invoke-Probe -Path '/api/mef/total') 401
-Test-Status 'GET /api/mef/proyectos' (Invoke-Probe -Path '/api/mef/proyectos') 401
-Test-Status 'POST /api/nlq' (Invoke-Probe -Method POST -Path '/api/nlq' -Body '{"query":"prueba"}' -ContentType 'application/json') 401
+Test-Redireccion 'GET /proyectos' (Invoke-Probe -Path '/proyectos') '/login'
+Test-Redireccion 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto') '/login'
 
 Write-Host "`n== USER ($NormalUser)" -ForegroundColor Cyan
 $userSession = New-SesionAutenticada $NormalUser $userPass
-Test-Permitido 'GET /api/mef/total' (Invoke-Probe -Path '/api/mef/total' -Session $userSession)
-Test-Status 'GET /api/mef/proyectos' (Invoke-Probe -Path '/api/mef/proyectos' -Session $userSession) 403
-Test-Html 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $userSession -FollowRedirects) $true
+Test-Redireccion 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $userSession) '/acceso-denegado'
+Test-Ok200 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto' -Session $userSession)
+Test-Html 'GET /acceso-denegado' (Invoke-Probe -Path '/acceso-denegado' -Session $userSession -FollowRedirects) 'Acceso denegado'
 
 Write-Host "`n== ADMIN ($AdminUser)" -ForegroundColor Cyan
 $adminSession = New-SesionAutenticada $AdminUser $adminPass
-Test-Permitido 'GET /api/mef/proyectos' (Invoke-Probe -Path '/api/mef/proyectos' -Session $adminSession)
-Test-Html 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $adminSession -FollowRedirects) $false
+Test-Ok200 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $adminSession)
+Test-Ok200 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto' -Session $adminSession)
 
 Write-Host ''
 if ($script:Fallos -eq 0) {
