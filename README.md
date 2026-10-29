@@ -37,14 +37,13 @@ src/
 ├── frontend/                     # Espacio base del frontend compartido del repo
 ├── n8n-workflows/                # Carpeta del backend y workflows n8n de Backend-Canchari
 │   ├── frontend/                 # index.html servido por Express
-│   ├── infrastructure/           # docker-compose y .env.example del backend
 │   ├── src/                      # Código TypeScript del backend
 │   ├── package.json              # Scripts Node del backend
 │   └── tsconfig.json             # Configuración TypeScript del backend
 ├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
 └── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
 .gitignore
-infrastructure/                   # Recursos compartidos del proyecto
+infrastructure/                   # docker-compose, Dockerfiles y .env.example del backend
 LICENSE
 README.md
 ```
@@ -63,17 +62,9 @@ cd FinEdu-Bot/src/n8n-workflows
 npm install
 ```
 
-Crear un archivo `.env` en `src/n8n-workflows`, siguiendo la plantilla de `src/n8n-workflows/infrastructure/.env.example`:
+Copiar `infrastructure/.env.example` como `infrastructure/.env` (en la raíz del repo) y completar los valores. El backend lee ese archivo al arrancar desde `src/n8n-workflows`. Las variables imprescindibles para el chat son `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_AUTH_HEADER` y `N8N_WEBHOOK_AUTH_SECRET`; el resto de variables y sus valores de ejemplo están documentados en el propio `.env.example`.
 
-```env
-NODE_ENV=development
-PORT=3000
-API_PREFIX=/api
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/finedu_bot
-N8N_WEBHOOK_URL=http://localhost:5678/webhook
-N8N_WEBHOOK_AUTH_HEADER=X-Api-Key
-N8N_WEBHOOK_AUTH_SECRET=<secreto-generado-con-openssl-rand-hex-32>
-```
+El archivo `.env` está ignorado por Git y nunca debe subirse al repositorio.
 
 **Autenticación de servicio (HU-44):** el Webhook del chat en n8n (`ai-agent-orchestrator`) usa Header Auth. El backend Express envía la cabecera `N8N_WEBHOOK_AUTH_HEADER` con el valor de `N8N_WEBHOOK_AUTH_SECRET` en cada petición, y n8n la valida antes de ejecutar el flujo. El secreto se genera con `openssl rand -hex 32`, se guarda solo en el `.env` (que no se sube al repo) y debe coincidir con la credencial Header Auth configurada en n8n.
 
