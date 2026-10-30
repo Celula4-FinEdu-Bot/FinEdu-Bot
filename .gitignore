@@ -112,3 +112,8 @@ artifacts/
 
 *.tmp
 *.temp
+
+gitleaks-ca02.json
+
+# Copia local de referencia
+FinEdu-Bot-FrontEnd-Zamudio/
