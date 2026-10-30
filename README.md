@@ -14,6 +14,7 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
 - [Requisitos previos](#requisitos-previos)
 - [Cómo correr el proyecto en local](#cómo-correr-el-proyecto-en-local)
 - [Flujo de datos](#flujo-de-datos)
+- [Autorización por rol](#autorización-por-rol)
 - [Stack tecnológico](#stack-tecnológico)
 - [Flujo de trabajo y control de calidad (DevSecOps)](#flujo-de-trabajo-y-control-de-calidad-devsecops)
 - [Seguridad](#seguridad)
@@ -94,12 +95,40 @@ Abrir el navegador en `http://localhost:3000`. Debe mostrarse la pantalla princi
 El recorrido de una consulta a través del sistema, de punta a punta, es el siguiente:
 
 1. **Frontend (usuario):** ingresa la pregunta en `home.razor`, que se envía vía HTTP POST con `chatInput` y `sessionId`.
-2. **Backend (Node.js/Express):** recibe la petición, procesa el JSON y lo reenvía de forma segura al orquestador mediante una llamada al webhook.
-3. **Orquestador (n8n):** recibe los datos y asigna la sesión en memoria (Window Buffer Memory).
+2. **Backend (Node.js/Express):** recibe la petición, procesa el JSON y lo reenvía de forma segura al orquestador mediante una llamada al webhook. La llamada incluye una cabecera de autenticación de servicio (por defecto `X-Api-Key`, configurable con `N8N_WEBHOOK_AUTH_HEADER`) cuyo valor se lee de la variable de entorno `N8N_WEBHOOK_AUTH_SECRET`.
+3. **Orquestador (n8n):** el nodo Webhook valida esa cabecera (Header Auth) y rechaza con HTTP 403 cualquier solicitud sin una credencial válida, antes de ejecutar el agente de IA o las herramientas. Si la validación es correcta, recibe los datos y asigna la sesión en memoria (Window Buffer Memory).
 4. **AI Agent + LLM:** analiza la pregunta y decide si debe usar la herramienta `knowledge_base` (búsqueda semántica).
 5. **PostgreSQL (PGVector Store):** busca similitudes matemáticas (embeddings) en los documentos del MEF y devuelve el contexto al Agente.
 6. **AI Agent + Security Filter:** el Agente redacta la respuesta, el filtro valida que sea `SAFE`, y n8n la devuelve al Backend.
 7. **Frontend (usuario):** la respuesta se renderiza en la pantalla del navegador.
+
+## Autorización por rol
+
+El frontend Blazor (`src/frontend/src`) restringe las páginas según el rol del usuario (HU-40).
+
+- **Roles:** existen dos, `ADMIN` y `USER`, tomados de la tabla `app_roles` de la base de datos. Al iniciar sesión, la función `authenticate_app_user` devuelve el código de rol del usuario.
+- **Sesión:** el rol viaja en el claim `ClaimTypes.Role` de la cookie de autenticación (`FinEdu.Auth`).
+- **Políticas** (definidas en `Program.cs`, con las constantes de `Security/AuthRoles.cs`):
+  - `AdminOnly`: usuario autenticado con rol `ADMIN`.
+  - `AuthenticatedUser`: usuario autenticado con rol `ADMIN` o `USER`.
+
+| Ruta | ADMIN | USER |
+|---|:---:|:---:|
+| `/` (Inicio / NLQ) | ✅ | ✅ |
+| `/presupuesto` | ✅ | ✅ |
+| `/contrataciones` | ✅ | ✅ |
+| `/proyectos` | ✅ | ❌ |
+
+- **Sin sesión:** cualquier ruta protegida redirige a `/login`.
+- **Sin permiso:** un usuario con sesión pero sin el rol requerido ve la página `/acceso-denegado`. Además, el menú lateral oculta el enlace "Proyectos" a quien no es `ADMIN`.
+
+**Cómo probarlo:** con el frontend en ejecución y un usuario de cada rol en la base de datos, ejecutar:
+
+```powershell
+.\src\frontend\tests\probar-autorizacion.ps1 -BaseUrl http://localhost:5000 -AdminUser <usuario-admin> -NormalUser <usuario-user>
+```
+
+El script pide las contraseñas por consola (no se guardan en ningún archivo) y muestra `OK`/`FALLO` con el código HTTP y la cabecera `Location` de cada caso.
 
 ## Stack tecnológico
 
