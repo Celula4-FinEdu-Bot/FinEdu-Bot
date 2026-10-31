@@ -124,6 +124,7 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<MefService>();
+builder.Services.AddScoped<MefResumenService>();
 builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
