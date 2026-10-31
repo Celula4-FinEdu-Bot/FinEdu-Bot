@@ -1,4 +1,7 @@
 @page "/presupuesto"
+@using Microsoft.AspNetCore.Authorization
+@using src.Security
+@attribute [Authorize(Policy = AuthPolicies.AuthenticatedUser)]
 @using src.Models
 @using src.Services
 @inject NlqService NlqService

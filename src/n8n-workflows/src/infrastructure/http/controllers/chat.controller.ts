@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 
 import { env } from '../../../config/env';
+import { buildN8nHeaders } from '../n8n-auth';
 
 //según el flujo de trabajo se usa $json.body.sessionId y esto se enviará a n8n
 type ChatRequestBody = {
@@ -39,9 +40,7 @@ export const chatController = {
     try {
       const webhookResponse = await fetch(env.n8nWebhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: buildN8nHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           chatInput: chatInput.trim(),
           sessionId: sessionId.trim()

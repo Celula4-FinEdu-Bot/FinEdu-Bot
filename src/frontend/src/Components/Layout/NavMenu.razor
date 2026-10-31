@@ -57,19 +57,23 @@
 
             </NavLink>
 
-            <NavLink
-                href="/proyectos"
-                class="nav-link">
+            <AuthorizeView Roles="ADMIN" Context="adminAuth">
 
-                <span class="nav-icon">
-                    #
-                </span>
+                <NavLink
+                    href="/proyectos"
+                    class="nav-link">
 
-                <span>
-                    Proyectos
-                </span>
+                    <span class="nav-icon">
+                        #
+                    </span>
 
-            </NavLink>
+                    <span>
+                        Proyectos
+                    </span>
+
+                </NavLink>
+
+            </AuthorizeView>
 
             <div class="nav-section">
                 CONTRATACIONES

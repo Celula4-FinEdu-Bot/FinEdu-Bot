@@ -1,6 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Authorization
+@using src.Security
 
-@attribute [Authorize]
+@attribute [Authorize(Policy = AuthPolicies.AuthenticatedUser)]
 @page "/"
 @rendermode InteractiveServer
 

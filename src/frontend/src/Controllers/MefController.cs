@@ -3,16 +3,19 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using src.Interfaces;
 using src.Models;
+using src.Security;
 
 
 namespace src.Controllers;
 
 [ApiController]
 [Route("api/mef")]
+[Authorize(Policy = AuthPolicies.AuthenticatedUser)]
 public sealed class MefController : ControllerBase
 {
     private readonly IMeFService _mefService;
@@ -38,6 +41,7 @@ public sealed class MefController : ControllerBase
     }
 
     [HttpGet("proyectos")]
+    [Authorize(Policy = AuthPolicies.AdminOnly)]
     public async Task<ActionResult<IReadOnlyList<ProyectoPresupuestoDto>>>
         Proyectos(
             [FromQuery] int? anio,
