@@ -1,10 +1,11 @@
 {
-  "name": "FinEdu-Caso5-Cedula4 v4-3",
+  "name": "FinEdu-Caso5-Cedula4 v5",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "ai-agent-orchestrator",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -14,9 +15,15 @@
       "typeVersion": 2.1,
       "position": [
         0,
-        352
+        496
       ],
-      "webhookId": "777254bd-2b43-474f-a2a9-e64738d9927f"
+      "webhookId": "777254bd-2b43-474f-a2a9-e64738d9927f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1jfqa7FXptXbo2zm",
+          "name": "FinEdu Webhook Auth"
+        }
+      }
     },
     {
       "parameters": {
@@ -32,8 +39,8 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        592,
-        352
+        816,
+        496
       ],
       "onError": "continueErrorOutput"
     },
@@ -55,8 +62,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        240,
-        592
+        464,
+        720
       ],
       "credentials": {
         "openAiApi": {
@@ -76,8 +83,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.4,
       "position": [
-        368,
-        592
+        592,
+        720
       ]
     },
     {
@@ -90,8 +97,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
       "typeVersion": 1.1,
       "position": [
-        496,
-        592
+        720,
+        720
       ]
     },
     {
@@ -112,8 +119,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        784,
-        800
+        1008,
+        928
       ],
       "credentials": {
         "openAiApi": {
@@ -136,8 +143,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
       "typeVersion": 1.3,
       "position": [
-        384,
-        800
+        608,
+        928
       ],
       "credentials": {
         "postgres": {
@@ -153,8 +160,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
       "typeVersion": 1,
       "position": [
-        464,
-        1008
+        688,
+        1136
       ],
       "credentials": {
         "googlePalmApi": {
@@ -207,8 +214,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        784,
-        592
+        1008,
+        720
       ]
     },
     {
@@ -267,8 +274,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        912,
-        592
+        1136,
+        720
       ]
     },
     {
@@ -282,8 +289,8 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1040,
-        592
+        1264,
+        720
       ]
     },
     {
@@ -304,8 +311,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        1120,
-        800
+        1344,
+        928
       ],
       "credentials": {
         "openAiApi": {
@@ -343,8 +350,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1392,
-        528
+        1616,
+        672
       ]
     },
     {
@@ -379,8 +386,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        2112,
-        0
+        2560,
+        48
       ]
     },
     {
@@ -397,8 +404,8 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        1648,
-        352
+        2096,
+        400
       ],
       "retryOnFail": true,
       "maxTries": 3,
@@ -417,8 +424,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        1632,
-        592
+        2080,
+        624
       ],
       "credentials": {
         "googlePalmApi": {
@@ -438,8 +445,8 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1760,
-        592
+        2208,
+        624
       ]
     },
     {
@@ -454,8 +461,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        1840,
-        800
+        2288,
+        832
       ],
       "credentials": {
         "googlePalmApi": {
@@ -496,8 +503,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        2112,
-        352
+        2560,
+        320
       ]
     },
     {
@@ -556,7 +563,7 @@
       "typeVersion": 3.5,
       "position": [
         2784,
-        704
+        736
       ]
     },
     {
@@ -570,8 +577,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        3008,
-        656
+        3456,
+        528
       ]
     },
     {
@@ -581,8 +588,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        2336,
-        176
+        2784,
+        240
       ]
     },
     {
@@ -596,8 +603,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        2560,
-        80
+        3008,
+        48
       ]
     },
     {
@@ -639,8 +646,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        2784,
-        80
+        3232,
+        48
       ]
     },
     {
@@ -663,8 +670,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        3008,
-        32
+        3456,
+        0
       ]
     },
     {
@@ -697,8 +704,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2560,
-        464
+        3008,
+        240
       ],
       "credentials": {
         "postgres": {
@@ -733,8 +740,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        304,
-        352
+        224,
+        496
       ]
     },
     {
@@ -763,8 +770,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1520,
-        256
+        1840,
+        400
       ]
     },
     {
@@ -776,8 +783,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2560,
-        912
+        3008,
+        432
       ]
     },
     {
@@ -794,8 +801,6 @@
         },
         "columns": {
           "mappingMode": "defineBelow",
-          "matchingColumns": [],
-          "schema": [],
           "value": {
             "correlation_id": "={{ $json.correlation_id }}",
             "costo_origen": "={{ $json.costo_origen }}",
@@ -813,7 +818,176 @@
             "tokens_salida": "={{ $json.tokens_salida }}",
             "tokens_total": "={{ $json.tokens_total }}",
             "uso_failover": "={{ $json.uso_failover }}"
-          }
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latencia_total_ms",
+              "displayName": "latencia_total_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "latencia_proveedor_ms",
+              "displayName": "latencia_proveedor_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tokens_entrada",
+              "displayName": "tokens_entrada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tokens_salida",
+              "displayName": "tokens_salida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tokens_total",
+              "displayName": "tokens_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tokens_origen",
+              "displayName": "tokens_origen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "proveedor",
+              "displayName": "proveedor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "modelo",
+              "displayName": "modelo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "uso_failover",
+              "displayName": "uso_failover",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error_mensaje",
+              "displayName": "error_mensaje",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "costo_usd",
+              "displayName": "costo_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "costo_origen",
+              "displayName": "costo_origen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
@@ -822,8 +996,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2784,
-        912
+        3232,
+        432
       ],
       "credentials": {
         "postgres": {
@@ -1192,7 +1366,7 @@
     "binaryMode": "separate",
     "availableInMCP": true
   },
-  "versionId": "4abf5146-107f-44e4-b891-54d011faccf4",
+  "versionId": "a2ba7704-284e-4df2-aa72-09d0d886f16d",
   "meta": {
     "aiBuilderAssisted": true,
     "builderVariant": "mcp",

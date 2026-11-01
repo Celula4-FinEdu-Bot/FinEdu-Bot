@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 
 using src.Components;
+using src.Security;
 using src.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -98,7 +99,7 @@ builder.Services
         options.Cookie.Name = "FinEdu.Auth";
 
         options.LoginPath = "/login";
-        options.AccessDeniedPath = "/login";
+        options.AccessDeniedPath = "/acceso-denegado";
 
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
@@ -111,9 +112,54 @@ builder.Services
             builder.Environment.IsDevelopment()
                 ? CookieSecurePolicy.SameAsRequest
                 : CookieSecurePolicy.Always;
+
+        // Las rutas /api responden 401/403 en lugar de redirigir a una página HTML.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                }
+
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return ctx.Response.WriteAsJsonAsync(new
+                    {
+                        success = false,
+                        error = "acceso_denegado",
+                        message = "No tienes permiso para realizar esta operación."
+                    });
+                }
+
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            }
+        };
     });
 
-builder.Services.AddAuthorization();
+// ============================================================
+// AUTORIZACIÓN POR ROL (HU-40)
+// ============================================================
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AuthPolicies.AdminOnly, policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole(AuthRoles.Admin));
+
+    options.AddPolicy(AuthPolicies.AuthenticatedUser, policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole(AuthRoles.Admin, AuthRoles.User));
+});
 
 builder.Services.AddCascadingAuthenticationState();
 

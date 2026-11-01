@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using src.Interfaces;
 using src.Models;
+using src.Security;
 
 
 namespace src.Controllers;
@@ -14,6 +16,7 @@ namespace src.Controllers;
 
 [ApiController]
 [Route("api/nlq")]
+[Authorize(Policy = AuthPolicies.AuthenticatedUser)]
 public sealed class NlqController : ControllerBase
 {
     private readonly INlqService _nlqService;
