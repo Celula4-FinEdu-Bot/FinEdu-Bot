@@ -176,7 +176,7 @@ builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
 builder.Services.AddScoped<OeceBackendService>();
 builder.Services.AddScoped<QuePasoHoyService>();
-
+builder.Services.AddHttpClient<OeceHoyService>();
 
 var dataProtectionPath =
     Environment.GetEnvironmentVariable("DATA_PROTECTION_PATH");
