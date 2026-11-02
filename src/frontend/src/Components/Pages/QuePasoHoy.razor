@@ -79,9 +79,19 @@ else
         {
             resumen = await QuePasoHoyService.ObtenerUltimoAsync();
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            Logger.LogError(ex, "Error al cargar ¿Qué pasó hoy?");
+            Logger.LogError(ex, "Error de red al cargar ¿Qué pasó hoy?");
+            error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
+        }
+        catch (TaskCanceledException ex)
+        {
+            Logger.LogError(ex, "Timeout/cancelación al cargar ¿Qué pasó hoy?");
+            error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Error de estado al cargar ¿Qué pasó hoy?");
             error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
         }
         finally
