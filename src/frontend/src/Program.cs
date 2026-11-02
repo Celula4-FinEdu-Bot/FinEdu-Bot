@@ -1,44 +1,87 @@
+
 using System.Security.Claims;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
+
+using Microsoft.AspNetCore.HttpOverrides;
+
 using Npgsql;
+
 using src.Components;
+using src.Security;
 using src.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================================
-// CONFIGURACIÓN (JSON + User Secrets + Env Vars)
-// Orden de precedencia (último gana):
-//   appsettings.json < appsettings.{Env}.json < User Secrets < Env Vars
+// CONFIGURACIÓN
+//
+// WebApplication.CreateBuilder carga appsettings, User Secrets
+// en desarrollo y variables de entorno.
+// En Render, las variables de entorno tienen prioridad sobre
+// los valores de configuración de los archivos JSON.
 // ============================================================
 
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json",
-                 optional: true, reloadOnChange: true);
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Configuration.AddUserSecrets<Program>(optional: true);
-}
-
-builder.Configuration.AddEnvironmentVariables();
-
-// Validación temprana: falla rápido si falta la cadena de conexión
-var connStringPreview = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connStringPreview))
+if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
         "Falta ConnectionStrings:DefaultConnection. " +
-        "En desarrollo usa 'dotnet user-secrets set'. " +
-        "En producción configura la variable de entorno 'ConnectionStrings__DefaultConnection'.");
+        "En desarrollo configura User Secrets. " +
+        "En Render configura ConnectionStrings__DefaultConnection.");
 }
 
+// ============================================================
+// DATA PROTECTION
+//
+// No se configura una ruta de claves ni un certificado.
+// ASP.NET Core utilizará su almacenamiento predeterminado.
+//
+// En el plan gratuito de Render, las claves pueden perderse
+// cuando se destruye el contenedor. Esto puede cerrar sesiones
+// existentes después de un reinicio o redespliegue.
+// ============================================================
+
+builder.Services
+    .AddDataProtection()
+    .SetApplicationName("FinEduBot")
+    .UseEphemeralDataProtectionProvider();
 
 // ============================================================
-// RAZOR COMPONENTS
+// PROXY INVERSO DE RENDER
+//
+// Render termina HTTPS y reenvía la petición al contenedor.
+// Procesar X-Forwarded-Proto antes de HTTPS redirection evita
+// que ASP.NET Core interprete erróneamente la petición como HTTP.
+//
+// La limpieza de proxies conocidos presupone que el servicio
+// solo recibe tráfico web a través del proxy de Render.
+// ============================================================
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+
+    if (!builder.Environment.IsDevelopment())
+    {
+        // Render puede usar direcciones variables para sus proxies.
+        // Solo usar este ajuste si el contenedor está protegido
+        // detrás del proxy de Render y no expuesto directamente.
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
+});
+
+// ============================================================
+// RAZOR COMPONENTS / BLAZOR
 // ============================================================
 
 builder.Services
@@ -46,7 +89,7 @@ builder.Services
     .AddInteractiveServerComponents();
 
 // ============================================================
-// AUTENTICACIÓN
+// AUTENTICACIÓN POR COOKIES
 // ============================================================
 
 builder.Services
@@ -56,17 +99,67 @@ builder.Services
         options.Cookie.Name = "FinEdu.Auth";
 
         options.LoginPath = "/login";
-        options.AccessDeniedPath = "/login";
+        options.AccessDeniedPath = "/acceso-denegado";
 
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
 
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // En producción, la cookie solo se envía mediante HTTPS.
+        options.Cookie.SecurePolicy =
+            builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
+
+        // Las rutas /api responden 401/403 en lugar de redirigir a una página HTML.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                }
+
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/api"))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return ctx.Response.WriteAsJsonAsync(new
+                    {
+                        success = false,
+                        error = "acceso_denegado",
+                        message = "No tienes permiso para realizar esta operación."
+                    });
+                }
+
+                ctx.Response.Redirect(ctx.RedirectUri);
+                return Task.CompletedTask;
+            }
+        };
     });
 
-builder.Services.AddAuthorization();
+// ============================================================
+// AUTORIZACIÓN POR ROL (HU-40)
+// ============================================================
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AuthPolicies.AdminOnly, policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole(AuthRoles.Admin));
+
+    options.AddPolicy(AuthPolicies.AuthenticatedUser, policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole(AuthRoles.Admin, AuthRoles.User));
+});
 
 builder.Services.AddCascadingAuthenticationState();
 
@@ -82,11 +175,29 @@ builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
 builder.Services.AddScoped<OeceBackendService>();
 
+
+var dataProtectionPath =
+    Environment.GetEnvironmentVariable("DATA_PROTECTION_PATH");
+
+if (!string.IsNullOrWhiteSpace(dataProtectionPath))
+{
+    Directory.CreateDirectory(dataProtectionPath);
+
+    builder.Services
+        .AddDataProtection()
+        .SetApplicationName("FinEduBot")
+        .PersistKeysToFileSystem(
+            new DirectoryInfo(dataProtectionPath));
+}
+
 var app = builder.Build();
 
 // ============================================================
-// PIPELINE
+// PIPELINE HTTP
 // ============================================================
+
+// Debe ejecutarse antes de HSTS y de HTTPS redirection.
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -94,14 +205,17 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
 
-app.UseAntiforgery();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseAntiforgery();
 
 // ============================================================
 // LOGIN
@@ -109,11 +223,13 @@ app.UseAuthorization();
 
 app.MapPost("/account/login", async (
     HttpContext httpContext,
-    IConfiguration configuration) =>
+    IConfiguration configuration,
+    ILogger<Program> logger) =>
 {
     var form = await httpContext.Request.ReadFormAsync();
 
     var username = form["username"].ToString().Trim();
+    var usernameForLog = username.Replace("\r", "").Replace("\n", "");
     var password = form["password"].ToString();
 
     if (string.IsNullOrWhiteSpace(username) ||
@@ -122,62 +238,47 @@ app.MapPost("/account/login", async (
         return Results.Redirect("/login?error=1");
     }
 
-    var connectionString =
-        configuration.GetConnectionString("DefaultConnection");
-
-    if (string.IsNullOrWhiteSpace(connectionString))
+    try
     {
-        return Results.Problem(
-            "No se encontró ConnectionStrings:DefaultConnection");
+        var loginConnectionString =
+            configuration.GetConnectionString("DefaultConnection");
+
+        await using var connection = new NpgsqlConnection(loginConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            "SELECT * FROM authenticate_app_user($1, $2)", connection);
+        command.Parameters.AddWithValue(username);
+        command.Parameters.AddWithValue(password);
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+        {
+            logger.LogWarning("Login fallido: sin filas para el usuario {User}", usernameForLog);
+            return Results.Redirect("/login?error=1");
+        }
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, reader.GetInt32(0).ToString()),
+            new(ClaimTypes.Name, reader.GetString(1)),
+            new("FullName", reader.GetString(2)),
+            new(ClaimTypes.Role, reader.GetString(3)),
+            new("RoleName", reader.GetString(4))
+        };
+
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "FinEduCookie"));
+        await httpContext.SignInAsync("FinEduCookie", principal);
+
+        logger.LogInformation("Login correcto: {User}", usernameForLog);
+        return Results.Redirect("/");
     }
-
-    await using var connection =
-        new NpgsqlConnection(connectionString);
-
-    await connection.OpenAsync();
-
-    await using var command =
-        new NpgsqlCommand(
-            "SELECT * FROM authenticate_app_user($1, $2)",
-            connection);
-
-    command.Parameters.AddWithValue(username);
-    command.Parameters.AddWithValue(password);
-
-    await using var reader =
-        await command.ExecuteReaderAsync();
-
-    if (!await reader.ReadAsync())
+    catch (Exception ex)
     {
-        return Results.Redirect("/login?error=1");
+        logger.LogError(ex, "Error en login para {User}", usernameForLog);
+        return Results.Redirect("/login?error=2");
     }
-
-    var userId = reader.GetInt32(0);
-    var dbUsername = reader.GetString(1);
-    var fullName = reader.GetString(2);
-    var roleCode = reader.GetString(3);
-    var roleName = reader.GetString(4);
-
-    var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-        new Claim(ClaimTypes.Name, dbUsername),
-        new Claim("FullName", fullName),
-        new Claim(ClaimTypes.Role, roleCode),
-        new Claim("RoleName", roleName)
-    };
-
-    var identity = new ClaimsIdentity(
-        claims,
-        "FinEduCookie");
-
-    var principal = new ClaimsPrincipal(identity);
-
-    await httpContext.SignInAsync(
-        "FinEduCookie",
-        principal);
-
-    return Results.Redirect("/");
 });
 
 // ============================================================

@@ -14,6 +14,7 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
 - [Requisitos previos](#requisitos-previos)
 - [Cómo correr el proyecto en local](#cómo-correr-el-proyecto-en-local)
 - [Flujo de datos](#flujo-de-datos)
+- [Autorización por rol](#autorización-por-rol)
 - [Stack tecnológico](#stack-tecnológico)
 - [Flujo de trabajo y control de calidad (DevSecOps)](#flujo-de-trabajo-y-control-de-calidad-devsecops)
 - [Seguridad](#seguridad)
@@ -37,14 +38,13 @@ src/
 ├── frontend/                     # Espacio base del frontend compartido del repo
 ├── n8n-workflows/                # Carpeta del backend y workflows n8n de Backend-Canchari
 │   ├── frontend/                 # index.html servido por Express
-│   ├── infrastructure/           # docker-compose y .env.example del backend
 │   ├── src/                      # Código TypeScript del backend
 │   ├── package.json              # Scripts Node del backend
 │   └── tsconfig.json             # Configuración TypeScript del backend
 ├── database/                     # Migraciones y seeders (PostgreSQL + pgvector)
 └── ia-ops/                       # Prompts, pruebas de QA/seguridad y observabilidad
 .gitignore
-infrastructure/                   # Recursos compartidos del proyecto
+infrastructure/                   # docker-compose, Dockerfiles y .env.example del backend
 LICENSE
 README.md
 ```
@@ -63,15 +63,11 @@ cd FinEdu-Bot/src/n8n-workflows
 npm install
 ```
 
-Crear un archivo `.env` en `src/n8n-workflows`, siguiendo la plantilla de `src/n8n-workflows/infrastructure/.env.example`:
+Copiar `infrastructure/.env.example` como `infrastructure/.env` (en la raíz del repo) y completar los valores. El backend lee ese archivo al arrancar desde `src/n8n-workflows`. Las variables imprescindibles para el chat son `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_AUTH_HEADER` y `N8N_WEBHOOK_AUTH_SECRET`; el resto de variables y sus valores de ejemplo están documentados en el propio `.env.example`.
 
-```env
-NODE_ENV=development
-PORT=3000
-API_PREFIX=/api
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/finedu_bot
-N8N_WEBHOOK_URL=http://localhost:5678/webhook
-```
+El archivo `.env` está ignorado por Git y nunca debe subirse al repositorio.
+
+**Autenticación de servicio (HU-44):** el Webhook del chat en n8n (`ai-agent-orchestrator`) usa Header Auth. El backend Express envía la cabecera `N8N_WEBHOOK_AUTH_HEADER` con el valor de `N8N_WEBHOOK_AUTH_SECRET` en cada petición, y n8n la valida antes de ejecutar el flujo. El secreto se genera con `openssl rand -hex 32`, se guarda solo en el `.env` (que no se sube al repo) y debe coincidir con la credencial Header Auth configurada en n8n.
 
 Levantar el servidor:
 
@@ -99,12 +95,40 @@ Abrir el navegador en `http://localhost:3000`. Debe mostrarse la pantalla princi
 El recorrido de una consulta a través del sistema, de punta a punta, es el siguiente:
 
 1. **Frontend (usuario):** ingresa la pregunta en `home.razor`, que se envía vía HTTP POST con `chatInput` y `sessionId`.
-2. **Backend (Node.js/Express):** recibe la petición, procesa el JSON y lo reenvía de forma segura al orquestador mediante una llamada al webhook.
-3. **Orquestador (n8n):** recibe los datos y asigna la sesión en memoria (Window Buffer Memory).
+2. **Backend (Node.js/Express):** recibe la petición, procesa el JSON y lo reenvía de forma segura al orquestador mediante una llamada al webhook. La llamada incluye una cabecera de autenticación de servicio (por defecto `X-Api-Key`, configurable con `N8N_WEBHOOK_AUTH_HEADER`) cuyo valor se lee de la variable de entorno `N8N_WEBHOOK_AUTH_SECRET`.
+3. **Orquestador (n8n):** el nodo Webhook valida esa cabecera (Header Auth) y rechaza con HTTP 403 cualquier solicitud sin una credencial válida, antes de ejecutar el agente de IA o las herramientas. Si la validación es correcta, recibe los datos y asigna la sesión en memoria (Window Buffer Memory).
 4. **AI Agent + LLM:** analiza la pregunta y decide si debe usar la herramienta `knowledge_base` (búsqueda semántica).
 5. **PostgreSQL (PGVector Store):** busca similitudes matemáticas (embeddings) en los documentos del MEF y devuelve el contexto al Agente.
 6. **AI Agent + Security Filter:** el Agente redacta la respuesta, el filtro valida que sea `SAFE`, y n8n la devuelve al Backend.
 7. **Frontend (usuario):** la respuesta se renderiza en la pantalla del navegador.
+
+## Autorización por rol
+
+El frontend Blazor (`src/frontend/src`) restringe las páginas según el rol del usuario (HU-40).
+
+- **Roles:** existen dos, `ADMIN` y `USER`, tomados de la tabla `app_roles` de la base de datos. Al iniciar sesión, la función `authenticate_app_user` devuelve el código de rol del usuario.
+- **Sesión:** el rol viaja en el claim `ClaimTypes.Role` de la cookie de autenticación (`FinEdu.Auth`).
+- **Políticas** (definidas en `Program.cs`, con las constantes de `Security/AuthRoles.cs`):
+  - `AdminOnly`: usuario autenticado con rol `ADMIN`.
+  - `AuthenticatedUser`: usuario autenticado con rol `ADMIN` o `USER`.
+
+| Ruta | ADMIN | USER |
+|---|:---:|:---:|
+| `/` (Inicio / NLQ) | ✅ | ✅ |
+| `/presupuesto` | ✅ | ✅ |
+| `/contrataciones` | ✅ | ✅ |
+| `/proyectos` | ✅ | ❌ |
+
+- **Sin sesión:** cualquier ruta protegida redirige a `/login`.
+- **Sin permiso:** un usuario con sesión pero sin el rol requerido ve la página `/acceso-denegado`. Además, el menú lateral oculta el enlace "Proyectos" a quien no es `ADMIN`.
+
+**Cómo probarlo:** con el frontend en ejecución y un usuario de cada rol en la base de datos, ejecutar:
+
+```powershell
+.\src\frontend\tests\probar-autorizacion.ps1 -BaseUrl http://localhost:5000 -AdminUser <usuario-admin> -NormalUser <usuario-user>
+```
+
+El script pide las contraseñas por consola (no se guardan en ningún archivo) y muestra `OK`/`FALLO` con el código HTTP y la cabecera `Location` de cada caso.
 
 ## Stack tecnológico
 

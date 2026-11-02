@@ -9,8 +9,15 @@
             RouteData="routeData"
             DefaultLayout="typeof(Layout.MainLayout)">
 
-            <NotAuthorized>
-                <RedirectToLogin />
+            <NotAuthorized Context="auth">
+                @if (auth.User.Identity?.IsAuthenticated == true)
+                {
+                    <src.Components.Pages.AccesoDenegado />
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
             </NotAuthorized>
 
         </AuthorizeRouteView>
