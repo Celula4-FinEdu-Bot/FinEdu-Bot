@@ -15,6 +15,7 @@ Bot conversacional que permite a ciudadanos y periodistas consultar en lenguaje 
 - [Cómo correr el proyecto en local](#cómo-correr-el-proyecto-en-local)
 - [Flujo de datos](#flujo-de-datos)
 - [Autorización por rol](#autorización-por-rol)
+- [Vista "¿Qué pasó hoy?"](#vista-qué-pasó-hoy)
 - [Stack tecnológico](#stack-tecnológico)
 - [Flujo de trabajo y control de calidad (DevSecOps)](#flujo-de-trabajo-y-control-de-calidad-devsecops)
 - [Seguridad](#seguridad)
@@ -116,6 +117,7 @@ El frontend Blazor (`src/frontend/src`) restringe las páginas según el rol del
 |---|:---:|:---:|
 | `/` (Inicio / NLQ) | ✅ | ✅ |
 | `/presupuesto` | ✅ | ✅ |
+| `/que-paso-hoy` | ✅ | ✅ |
 | `/contrataciones` | ✅ | ✅ |
 | `/proyectos` | ✅ | ❌ |
 
@@ -125,10 +127,19 @@ El frontend Blazor (`src/frontend/src`) restringe las páginas según el rol del
 **Cómo probarlo:** con el frontend en ejecución y un usuario de cada rol en la base de datos, ejecutar:
 
 ```powershell
-.\src\frontend\tests\probar-autorizacion.ps1 -BaseUrl http://localhost:5000 -AdminUser <usuario-admin> -NormalUser <usuario-user>
+.\src\frontend\tests\probar-autorizacion.ps1 -BaseUrl http://localhost:5204 -AdminUser <usuario-admin> -NormalUser <usuario-user>
 ```
 
 El script pide las contraseñas por consola (no se guardan en ningún archivo) y muestra `OK`/`FALLO` con el código HTTP y la cabecera `Location` de cada caso.
+
+## Vista "¿Qué pasó hoy?"
+
+La página `/que-paso-hoy` del frontend Blazor muestra un resumen del presupuesto del MEF para los años 2017-2021. La pueden ver los roles `ADMIN` y `USER`.
+
+- **Datos:** el flujo de n8n crea y llena la tabla `que_paso_hoy`. Su esquema está documentado en `src/database/migrations/que_paso_hoy.sql`.
+- **Qué muestra:** solo las filas de la fecha más reciente (`MAX(fecha)`). El indicador con `destacado = true` aparece en una tarjeta grande y el resto como tarjetas pequeñas, junto con la fecha de `actualizado_en` en hora de Perú.
+- **Formato de `valor`:** si el `indicador` termina en `_pct`, el valor está en puntos porcentuales (`85.3` = 85,3 %) y se muestra con un decimal. Cualquier otro indicador se muestra en soles (`S/`) con dos decimales. Ambos usan el formato regional `es-PE`.
+- **Sin datos:** si la tabla está vacía o todavía no existe, la página muestra "Aún no hay datos para mostrar".
 
 ## Stack tecnológico
 
