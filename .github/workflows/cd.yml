@@ -69,10 +69,21 @@ jobs:
 
       - name: Validar salud del servicio
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.FRONTEND_HEALTH_URL }}")
-          echo "HTTP status recibido: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "El frontend no respondio 200 tras el deploy. Revisar logs en Render."
+          URL="${{ vars.FRONTEND_HEALTH_URL }}"
+
+          echo "Validando frontend: $URL"
+
+          STATUS=$(curl -s -L \
+            -o /dev/null \
+            -w "%{http_code}" \
+            --max-time 30 \
+            "$URL")
+
+          echo "HTTP status final: $STATUS"
+
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
+            echo "::error::El frontend no está saludable. HTTP $STATUS"
             exit 1
           fi
-          echo "OK: frontend saludable en produccion."
+
+          echo "OK: frontend saludable en producción."

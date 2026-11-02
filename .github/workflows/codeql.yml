@@ -1,4 +1,8 @@
-name: SAST - Analisis Estatico de Seguridad
+name: SAST - Analisis Estatico de Seguridad (CodeQL)
+
+# Se ejecuta sin filtro de "paths" a proposito: este workflow es un
+# required check en main. Si tuviera paths, un PR que no toque codigo
+# quedaria bloqueado indefinidamente en "Expected - Waiting for status".
 
 on:
   pull_request:
@@ -6,49 +10,132 @@ on:
   push:
     branches: [main, develop]
   schedule:
+    # Escaneo semanal: detecta CVEs nuevas sobre codigo que ya estaba mergeado.
     - cron: "0 6 * * 1"
 
-jobs:
-  analyze:
-    name: CodeQL - ${{ matrix.language }}
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
+permissions:
+  contents: read
+  security-events: write
+  actions: read
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ["csharp"]
+jobs:
+  # ------------------------------------------------------------------
+  # JOB 1 - Deteccion dinamica de lenguajes
+  # Evita que CodeQL falle sobre carpetas aun vacias o en desarrollo.
+  # Construye la matriz solo con los lenguajes que tienen codigo real.
+  # ------------------------------------------------------------------
+  detectar-lenguajes:
+    name: Detectar lenguajes con codigo real
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.deteccion.outputs.languages }}
+      hay-codigo: ${{ steps.deteccion.outputs.hay-codigo }}
 
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Verificar si hay codigo real para este lenguaje
-        id: check
+      - name: Detectar lenguajes presentes
+        id: deteccion
         run: |
-          MATCH=$(find . -path "*/node_modules" -prune -o -path "*/bin" -prune -o -path "*/obj" -prune -o -type f -iname "*.cs" -print | head -1)
-          if [ -n "$MATCH" ]; then
-            echo "has_code=true" >> "$GITHUB_OUTPUT"
-            echo "Codigo encontrado: $MATCH"
-          else
-            echo "has_code=false" >> "$GITHUB_OUTPUT"
-            echo "Aun no hay codigo C# en el repositorio. Se omite el analisis."
+          LENGUAJES=()
+
+          # C# / .NET  -> frontend Blazor
+          if find . -name "*.cs" -o -name "*.csproj" | grep -q . 2>/dev/null; then
+            LENGUAJES+=("csharp")
+            echo "Detectado: C# (.NET)"
           fi
 
+          # JavaScript / TypeScript -> backend Express
+          if find . -name "*.ts" -o -name "*.js" -not -path "./node_modules/*" | grep -q . 2>/dev/null; then
+            LENGUAJES+=("javascript-typescript")
+            echo "Detectado: JavaScript/TypeScript"
+          fi
+
+          # Python -> src/ia-ops
+          if find . -name "*.py" | grep -q . 2>/dev/null; then
+            LENGUAJES+=("python")
+            echo "Detectado: Python"
+          fi
+
+          # GitHub Actions -> los propios workflows del repo
+          if find .github/workflows -name "*.yml" -o -name "*.yaml" | grep -q . 2>/dev/null; then
+            LENGUAJES+=("actions")
+            echo "Detectado: GitHub Actions"
+          fi
+
+          if [ ${#LENGUAJES[@]} -eq 0 ]; then
+            echo "No se encontro codigo analizable. Se omite CodeQL."
+            echo "hay-codigo=false" >> "$GITHUB_OUTPUT"
+            echo 'languages=[]' >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(printf '%s\n' "${LENGUAJES[@]}" | jq -R . | jq -sc .)
+            echo "Lenguajes a analizar: $JSON"
+            echo "hay-codigo=true" >> "$GITHUB_OUTPUT"
+            echo "languages=$JSON" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ------------------------------------------------------------------
+  # JOB 2 - Analisis CodeQL por lenguaje
+  # build-mode: none evita tener que compilar el proyecto. Necesario
+  # porque DevSecOps no modifica el codigo de frontend ni de backend.
+  # ------------------------------------------------------------------
+  analisis-codeql:
+    name: CodeQL (${{ matrix.language }})
+    needs: detectar-lenguajes
+    if: needs.detectar-lenguajes.outputs.hay-codigo == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.detectar-lenguajes.outputs.languages) }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
       - name: Inicializar CodeQL
-        if: steps.check.outputs.has_code == 'true'
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-and-quality
 
-      - name: Analisis automatico
-        if: steps.check.outputs.has_code == 'true'
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Ejecutar analisis CodeQL
-        if: steps.check.outputs.has_code == 'true'
+      - name: Ejecutar analisis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+
+  # ------------------------------------------------------------------
+  # JOB 3 - Check agregador
+  # Este es el job que se marca como required en Branch Protection.
+  # Siempre reporta estado, incluso si no habia codigo que analizar,
+  # evitando PRs colgados en "Expected - Waiting for status".
+  # ------------------------------------------------------------------
+  resultado-sast:
+    name: Resultado SAST
+    needs: [detectar-lenguajes, analisis-codeql]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Evaluar resultado del analisis
+        run: |
+          if [ "${{ needs.detectar-lenguajes.outputs.hay-codigo }}" != "true" ]; then
+            echo "Sin codigo analizable en este PR. SAST omitido correctamente."
+            exit 0
+          fi
+
+          if [ "${{ needs.analisis-codeql.result }}" = "success" ]; then
+            echo "CodeQL completado sin errores de ejecucion."
+            exit 0
+          fi
+
+          echo "El analisis de CodeQL fallo. Revisar la pestana Security > Code scanning."
+          exit 1
