@@ -174,6 +174,7 @@ builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
 builder.Services.AddScoped<OeceBackendService>();
+builder.Services.AddScoped<QuePasoHoyService>();
 
 
 var dataProtectionPath =
