@@ -1,0 +1,59 @@
+title = "FinEdu - Gitleaks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "dotnet-connection-string-password"
+description = "Cadena de conexion con Password/Pwd literal"
+regex = '''(?i)\b(password|pwd)\s*=\s*[^;'"\s\$\{]{6,}'''
+keywords = ["password", "pwd"]
+tags = ["connection-string"]
+
+[[rules]]
+id = "url-with-credentials"
+description = "URL de base de datos o broker con usuario:clave"
+regex = '''(?i)(postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|amqps?|sqlserver)://[^:\s/@]+:[^@\s'"]{3,}@[^\s'"]+'''
+keywords = ["://"]
+tags = ["connection-string"]
+
+[[rules]]
+id = "groq-api-key"
+description = "API key de Groq"
+regex = '''\bgsk_[A-Za-z0-9]{20,}\b'''
+keywords = ["gsk_"]
+tags = ["llm"]
+
+[[rules]]
+id = "render-api-key"
+description = "API key de Render"
+regex = '''\brnd_[A-Za-z0-9]{20,}\b'''
+keywords = ["rnd_"]
+tags = ["render"]
+
+[[rules]]
+id = "render-deploy-hook"
+description = "Deploy Hook de Render (contiene key)"
+regex = '''https://api\.render\.com/deploy/srv-[A-Za-z0-9]+\?key=[A-Za-z0-9_-]+'''
+keywords = ["api.render.com/deploy"]
+tags = ["render"]
+
+[[rules]]
+id = "n8n-encryption-key"
+description = "N8N_ENCRYPTION_KEY con valor literal"
+regex = '''N8N_ENCRYPTION_KEY\s*[=:]\s*['"]?[A-Za-z0-9+/=_-]{16,}'''
+keywords = ["n8n_encryption_key"]
+tags = ["n8n"]
+
+[allowlist]
+description = "Falsos positivos documentados (justificar cada uno en docs/secrets.md)"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''^docs/.*\.md$''',
+  '''^SECURITY\.md$''',
+  '''^\.gitleaks\.toml$''',
+]
+regexes = [
+  '''CHANGE_ME''',
+  '''AKIAIOSFODNN7EXAMPLE''',
+]

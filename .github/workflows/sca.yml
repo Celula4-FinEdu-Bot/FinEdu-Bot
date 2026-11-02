@@ -1,20 +1,124 @@
-name: SCA - Analisis de Composicion de Software
+name: SAST - Analisis Estatico de Seguridad (CodeQL)
 
+# Sin filtro "paths" a proposito: es required check en main.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
+  security-events: write
+  actions: read
 
 jobs:
-  dependency-review:
+  detectar-lenguajes:
+    name: Detectar lenguajes con codigo real
     runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.deteccion.outputs.languages }}
+      hay-codigo: ${{ steps.deteccion.outputs.hay-codigo }}
+
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Revisar dependencias nuevas o modificadas en el PR
-        uses: actions/dependency-review-action@v4
+      - name: Detectar lenguajes presentes
+        id: deteccion
+        run: |
+          LENGUAJES=()
+          EXCL=( -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/bin/*" -not -path "*/obj/*" -not -path "*/.venv/*" )
+
+          # C# / .NET
+          if find . "${EXCL[@]}" \( -name "*.cs" -o -name "*.csproj" \) | grep -q .; then
+            LENGUAJES+=("csharp")
+            echo "Detectado: C# (.NET)"
+          fi
+
+          # JavaScript / TypeScript (agrupado: el -not aplica a ambos)
+          if find . "${EXCL[@]}" \( -name "*.ts" -o -name "*.js" \) | grep -q .; then
+            LENGUAJES+=("javascript-typescript")
+            echo "Detectado: JavaScript/TypeScript"
+          fi
+
+          # Python
+          if find . "${EXCL[@]}" -name "*.py" | grep -q .; then
+            LENGUAJES+=("python")
+            echo "Detectado: Python"
+          fi
+
+          # GitHub Actions
+          if find .github/workflows \( -name "*.yml" -o -name "*.yaml" \) | grep -q .; then
+            LENGUAJES+=("actions")
+            echo "Detectado: GitHub Actions"
+          fi
+
+          if [ ${#LENGUAJES[@]} -eq 0 ]; then
+            echo "No se encontro codigo analizable. Se omite CodeQL."
+            echo "hay-codigo=false" >> "$GITHUB_OUTPUT"
+            echo 'languages=[]' >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(printf '%s\n' "${LENGUAJES[@]}" | jq -R . | jq -sc .)
+            echo "Lenguajes a analizar: $JSON"
+            echo "hay-codigo=true" >> "$GITHUB_OUTPUT"
+            echo "languages=$JSON" >> "$GITHUB_OUTPUT"
+          fi
+
+  analisis-codeql:
+    name: CodeQL (${{ matrix.language }})
+    needs: detectar-lenguajes
+    if: needs.detectar-lenguajes.outputs.hay-codigo == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.detectar-lenguajes.outputs.languages) }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          fail-on-severity: high
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-and-quality
+
+      - name: Ejecutar analisis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Job agregador: el que se marca como required check
+  resultado-sast:
+    name: Resultado SAST
+    needs: [detectar-lenguajes, analisis-codeql]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Evaluar resultado del analisis
+        env:
+          HAY_CODIGO: ${{ needs.detectar-lenguajes.outputs.hay-codigo }}
+          RESULTADO: ${{ needs.analisis-codeql.result }}
+        run: |
+          if [ "$HAY_CODIGO" != "true" ]; then
+            echo "Sin codigo analizable. SAST omitido correctamente."
+            exit 0
+          fi
+          if [ "$RESULTADO" = "success" ]; then
+            echo "CodeQL completado sin errores de ejecucion."
+            exit 0
+          fi
+          echo "El analisis de CodeQL fallo. Revisar Security > Code scanning."
+          exit 1
