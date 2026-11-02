@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using src.Security;
 
 namespace src.Controllers
 {
     [Route("[controller]")]
+    [Authorize(Policy = AuthPolicies.AuthenticatedUser)]
     public class PresupuestoController : Controller
     {
         private readonly ILogger<PresupuestoController> _logger;

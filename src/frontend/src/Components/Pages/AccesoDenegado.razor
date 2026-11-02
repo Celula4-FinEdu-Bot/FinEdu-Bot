@@ -1,0 +1,11 @@
+@page "/acceso-denegado"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+<PageTitle>Acceso denegado | FinEdu-Bot</PageTitle>
+
+<div class="not-found-page">
+    <h1>Acceso denegado</h1>
+    <p>No tienes permiso para ver esta sección con tu rol actual.</p>
+    <a href="/">Volver al inicio</a>
+</div>

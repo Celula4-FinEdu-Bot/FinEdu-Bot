@@ -39,6 +39,20 @@
 
             </NavLink>
 
+            <NavLink
+                href="/que-paso-hoy"
+                class="nav-link">
+
+                <span class="nav-icon">
+                    ★
+                </span>
+
+                <span>
+                    ¿Qué pasó hoy?
+                </span>
+
+            </NavLink>
+
             <div class="nav-section">
                 INFORMACIÓN
             </div>
@@ -57,19 +71,23 @@
 
             </NavLink>
 
-            <NavLink
-                href="/proyectos"
-                class="nav-link">
+            <AuthorizeView Roles="ADMIN" Context="adminAuth">
 
-                <span class="nav-icon">
-                    #
-                </span>
+                <NavLink
+                    href="/proyectos"
+                    class="nav-link">
 
-                <span>
-                    Proyectos
-                </span>
+                    <span class="nav-icon">
+                        #
+                    </span>
 
-            </NavLink>
+                    <span>
+                        Proyectos
+                    </span>
+
+                </NavLink>
+
+            </AuthorizeView>
 
             <div class="nav-section">
                 CONTRATACIONES
