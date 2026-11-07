@@ -170,11 +170,13 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<MefService>();
+builder.Services.AddScoped<MefResumenService>();
 builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<OeceService>();
 builder.Services.AddScoped<BackendService>();
 builder.Services.AddScoped<OeceBackendService>();
-
+builder.Services.AddScoped<QuePasoHoyService>();
+builder.Services.AddHttpClient<OeceHoyService>();
 
 var dataProtectionPath =
     Environment.GetEnvironmentVariable("DATA_PROTECTION_PATH");

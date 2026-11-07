@@ -1,0 +1,151 @@
+@page "/que-paso-hoy-oece"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using System.Globalization
+@using src.Models
+@using src.Services
+@implements IAsyncDisposable
+@inject OeceHoyService HoyService
+
+<PageTitle>¿Qué pasó hoy? | OECE - FinEdu-Bot</PageTitle>
+<div class="hoy-wrap">
+    <div class="hoy-hero"><span>FINEDU-BOT · OBSERVATORIO OECE</span><h1>¿Qué pasó hoy?</h1>
+        <p>Hechos registrados en contrataciones públicas, sanciones, penalidades, inhabilitaciones y pronunciamientos.</p>
+        <small>Fecha de Perú (UTC−5). Los resultados dependen de los registros disponibles en nuestra base de datos.</small>
+    </div>
+    <section class="hoy-panel">
+        <div class="hoy-filters">
+            <label>
+                Fecha
+                <input type="date"
+                    min="2017-01-01"
+                    max="2026-12-31"
+                    @bind="FechaSeleccionada"
+                    @bind:format="yyyy-MM-dd" />
+            </label>
+
+            <label>Consulta<select @bind="Modo"><option value="historico">Este día entre 2017 y 2026</option><option value="exacto">Fecha exacta</option></select></label>
+            
+            <label>Tema<select @bind="Tipo"><option value="TODOS">Todos</option><option value="PENALIDAD">Penalidades</option><option value="SANCION">Sanciones</option><option value="INHABILITACION">Inhabilitaciones</option><option value="PRONUNCIAMIENTO">Pronunciamientos</option><option value="INSCRIPCION">Registro de entidades</option></select></label>
+            <label>Entidad o proveedor<input placeholder="Ej. Municipalidad de Tumbes" @bind="Entidad" @bind:event="oninput" maxlength="120" /></label>
+            <button class="hoy-btn" @onclick="ConsultarAsync" disabled="@Cargando">@(Cargando ? "Consultando..." : "Consultar acontecimientos")</button>
+        </div>
+        @if (!string.IsNullOrEmpty(Error)) { <p class="hoy-error" role="alert">@Error</p> }
+        @if (Resultado is not null)
+        {
+            <div class="hoy-summary"><strong>@Resultado.Total</strong> registros encontrados · <span>@(Modo == "historico" ? "Coincidencia de día y mes" : "Fecha exacta")</span>
+                @if (Resultado.Limitado) { <span> · Resultados limitados</span> }
+            </div>
+            @if (Resultado.Records.Count == 0) { <p>No se encontraron hechos para estos filtros. No significa que no hayan ocurrido otros acontecimientos.</p> }
+            <div class="hoy-grid">
+                @foreach (var e in Resultado.Records)
+                {
+                    <article class="hoy-event" @key="e.Tabla + e.Referencia + e.Fecha + e.Descripcion">
+                        <div class="hoy-event-head"><span>@e.Tipo</span><time>@e.Fecha</time></div>
+                        <h3>@e.Entidad</h3><p>@e.Descripcion</p>
+                        @if (e.Monto is decimal monto) { <strong>S/ @monto.ToString("N2", CultureInfo.GetCultureInfo("es-PE"))</strong> }
+                        <footer><small>Fuente: @e.Tabla @(!string.IsNullOrWhiteSpace(e.Referencia) ? "· " + e.Referencia : "")</small>
+                        @if (Uri.TryCreate(e.Url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
+                        { <a href="@e.Url" target="_blank" rel="noopener noreferrer">Ver documento</a> }</footer>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</div>
+<style>
+.hoy-wrap{padding:26px clamp(14px,3vw,40px);background:#f5f7fc;color:#152c4b;min-height:100vh}.hoy-hero{padding:28px;border-radius:18px;background:linear-gradient(120deg,#15335b,#235e9d);color:white}.hoy-hero span{font-size:12px;font-weight:800;letter-spacing:.15em;color:#bddeff}.hoy-hero h1{font-size:36px;margin:9px 0}.hoy-hero p{max-width:780px}.hoy-hero small{color:#d6e5f7}.hoy-panel{background:white;border:1px solid #dce4ef;border-radius:17px;padding:22px;margin-top:20px}.hoy-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;align-items:end}.hoy-filters label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:700}.hoy-filters input,.hoy-filters select{min-width:0;width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#132e51}.hoy-btn{padding:12px 15px;background:#1d63af;color:white;border:0;border-radius:8px;font-weight:750;cursor:pointer}.hoy-btn:disabled{opacity:.55}.hoy-summary{margin:24px 0 16px;border-bottom:1px solid #e2e8f0;padding-bottom:14px}.hoy-summary strong{font-size:22px;color:#165ea9}.hoy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:13px}.hoy-event{background:#fafcff;border:1px solid #dce6f1;border-radius:12px;padding:16px;overflow-wrap:anywhere}.hoy-event-head{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:#41638b;font-weight:700}.hoy-event h3{font-size:17px;margin:12px 0 7px}.hoy-event p{font-size:14px;line-height:1.5;color:#41536a}.hoy-event footer{display:flex;flex-wrap:wrap;gap:12px;margin-top:15px;justify-content:space-between}.hoy-error{color:#a61d24;background:#fff1f2;padding:12px;border-radius:8px}
+</style>
+@code {
+    private DateTime FechaSeleccionada = OeceHoyService.HoyPeru().ToDateTime(TimeOnly.MinValue);
+    private string Modo = "historico", Tipo = "TODOS", Entidad = "", Error = "";
+    private bool Cargando;
+    private OeceHoyResponse? Resultado;
+    private CancellationTokenSource? _cts;
+    private PeriodicTimer? _timer;
+    private Task? _pollTask;
+    protected override async Task OnInitializedAsync()
+    {
+        await ConsultarAsync();
+        _timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        _pollTask = VigilarCambioDeDiaAsync();
+    }
+    private async Task VigilarCambioDeDiaAsync()
+    {
+        try
+    {
+        while (_timer is not null &&
+            await _timer.WaitForNextTickAsync())
+        {
+            var actual = OeceHoyService.HoyPeru();
+
+            if (DateOnly.FromDateTime(FechaSeleccionada) != actual
+                && Modo == "historico")
+            {
+                await InvokeAsync(async () =>
+                {
+                    FechaSeleccionada = actual.ToDateTime(TimeOnly.MinValue);
+                    await ConsultarAsync();
+                });
+            }
+        }
+    }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+    }
+    private async Task ConsultarAsync()
+{
+    DateOnly fecha = DateOnly.FromDateTime(FechaSeleccionada);
+
+    if (fecha.Year < 2017 || fecha.Year > 2026)
+    {
+        Error = "Elige una fecha entre 2017 y 2026.";
+        return;
+    }
+
+    Cargando = true;
+    Error = "";
+
+    _cts?.Cancel();
+    _cts?.Dispose();
+
+    _cts = new CancellationTokenSource(
+        TimeSpan.FromSeconds(40)
+    );
+
+    try
+    {
+        Resultado = await HoyService.ConsultarAsync(
+            fecha,
+            Modo,
+            Tipo,
+            Entidad,
+            _cts.Token
+        );
+
+        if (!Resultado.Success)
+        {
+            Error = Resultado.Message ?? "No se pudo completar la consulta.";
+            Resultado = null;
+        }
+    }
+    catch (Exception ex) when (
+        ex is HttpRequestException or
+        InvalidOperationException or
+        OperationCanceledException)
+    {
+        Error = "No se pudo consultar OECE: " + ex.Message;
+        Resultado = null;
+    }
+    finally
+    {
+        Cargando = false;
+    }
+}
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose(); _cts?.Cancel();
+        if (_pollTask is not null) { try { await _pollTask; } catch (OperationCanceledException) {} }
+        _cts?.Dispose();
+    }
+}
