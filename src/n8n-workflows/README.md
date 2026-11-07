@@ -36,3 +36,4 @@ n8n-workflows/
 	package.json
 	tsconfig.json
 ```
+Deployment validation branch: arquitectura-vercel.
