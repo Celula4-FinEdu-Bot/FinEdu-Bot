@@ -1,0 +1,102 @@
+@page "/que-paso-hoy"
+@using Microsoft.AspNetCore.Authorization
+@using src.Security
+@attribute [Authorize(Policy = AuthPolicies.AuthenticatedUser)]
+@using src.Models
+@using src.Services
+@inject QuePasoHoyService QuePasoHoyService
+@inject ILogger<QuePasoHoy> Logger
+
+<PageTitle>¿Qué pasó hoy? | FinEdu-Bot</PageTitle>
+
+<h3>¿Qué pasó hoy?</h3>
+<p class="text-muted">Presupuesto público del MEF, años @resumen.RangoAnios</p>
+
+@if (cargando)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (!resumen.TieneDatos)
+{
+    <div class="alert alert-info">Aún no hay datos para mostrar.</div>
+}
+else
+{
+    @if (resumen.Destacado is { } destacado)
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-body">
+                <h5 class="card-title">@destacado.Titulo</h5>
+                <p class="display-5 fw-bold text-primary mb-2">@destacado.ValorDisplay</p>
+                @if (!string.IsNullOrWhiteSpace(destacado.Detalle))
+                {
+                    <p class="card-text">@destacado.Detalle</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (resumen.Otros.Count > 0)
+    {
+        <div class="row">
+            @foreach (var item in resumen.Otros)
+            {
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">@item.Titulo</h6>
+                            <p class="fs-5 fw-bold mb-1">@item.ValorDisplay</p>
+                            @if (!string.IsNullOrWhiteSpace(item.Detalle))
+                            {
+                                <small class="text-muted">@item.Detalle</small>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <small class="text-muted">Actualizado el @resumen.ActualizadoEnDisplay</small>
+}
+
+@code {
+    private QuePasoHoyResumen resumen = QuePasoHoyResumen.Vacio;
+    private bool cargando = true;
+    private string? error = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            resumen = await QuePasoHoyService.ObtenerUltimoAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Error de red al cargar ¿Qué pasó hoy?");
+            error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
+        }
+        catch (TaskCanceledException ex)
+        {
+            Logger.LogError(ex, "Timeout/cancelación al cargar ¿Qué pasó hoy?");
+            error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Error de estado al cargar ¿Qué pasó hoy?");
+            error = "No se pudieron cargar los datos. Intenta nuevamente más tarde.";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}
