@@ -15,23 +15,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-frontend:
-    name: Deploy Frontend (Blazor Server)
+  deploy:
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Disparar deploy en Render
-        id: trigger
+        id: deploy
         env:
-          # Los secretos se pasan por env, nunca interpolados dentro del script
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          RESPONSE=$(curl -s -X POST "$RENDER_DEPLOY_HOOK")
-          DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.deploy.id')
-          if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" == "null" ]; then
-            echo "No se pudo obtener el deploy_id. Revisar el Deploy Hook."
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK está vacío. Revisar el secret."
             exit 1
           fi
+
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+          echo "HTTP status: $HTTP_CODE"
+          echo "Body:"
+          cat response.json
+          echo
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "El hook respondió con error."
+            exit 1
+          fi
+
+          DEPLOY_ID=$(jq -r '.deploy.id // empty' response.json 2>/dev/null)
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "No se pudo obtener el deploy_id del cuerpo de la respuesta."
+            exit 1
+          fi
+
           echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
           echo "Deploy disparado con id: $DEPLOY_ID"
 
