@@ -140,17 +140,20 @@ $userPass = Read-Host "Contraseña de $NormalUser (USER)" -AsSecureString
 Write-Host "`n== Sin sesión ($BaseUrl)" -ForegroundColor Cyan
 Test-Redireccion 'GET /proyectos' (Invoke-Probe -Path '/proyectos') '/login'
 Test-Redireccion 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto') '/login'
+Test-Redireccion 'GET /que-paso-hoy' (Invoke-Probe -Path '/que-paso-hoy') '/login'
 
 Write-Host "`n== USER ($NormalUser)" -ForegroundColor Cyan
 $userSession = New-SesionAutenticada $NormalUser $userPass
 Test-Redireccion 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $userSession) '/acceso-denegado'
 Test-Ok200 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto' -Session $userSession)
+Test-Ok200 'GET /que-paso-hoy' (Invoke-Probe -Path '/que-paso-hoy' -Session $userSession)
 Test-Html 'GET /acceso-denegado' (Invoke-Probe -Path '/acceso-denegado' -Session $userSession -FollowRedirects) 'Acceso denegado'
 
 Write-Host "`n== ADMIN ($AdminUser)" -ForegroundColor Cyan
 $adminSession = New-SesionAutenticada $AdminUser $adminPass
 Test-Ok200 'GET /proyectos' (Invoke-Probe -Path '/proyectos' -Session $adminSession)
 Test-Ok200 'GET /presupuesto' (Invoke-Probe -Path '/presupuesto' -Session $adminSession)
+Test-Ok200 'GET /que-paso-hoy' (Invoke-Probe -Path '/que-paso-hoy' -Session $adminSession)
 
 Write-Host ''
 if ($script:Fallos -eq 0) {
