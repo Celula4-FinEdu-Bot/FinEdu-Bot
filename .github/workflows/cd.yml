@@ -21,27 +21,27 @@ jobs:
       - name: Disparar deploy en Render
         id: deploy
         env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
         run: |
-          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK está vacío. Revisar el secret."
-            exit 1
-          fi
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
 
-          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           echo "HTTP status: $HTTP_CODE"
-          echo "Body:"
-          cat response.json
-          echo
 
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "El hook respondió con error."
+            echo "Error de la API: $BODY"
             exit 1
           fi
 
-          DEPLOY_ID=$(jq -r '.deploy.id // empty' response.json 2>/dev/null)
+          DEPLOY_ID=$(echo "$BODY" | jq -r '.id // empty')
           if [ -z "$DEPLOY_ID" ]; then
-            echo "No se pudo obtener el deploy_id del cuerpo de la respuesta."
+            echo "No se pudo obtener el deploy_id: $BODY"
             exit 1
           fi
 
