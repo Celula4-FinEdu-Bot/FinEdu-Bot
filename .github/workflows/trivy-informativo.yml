@@ -1,0 +1,32 @@
+name: Trivy Config (informativo)
+
+# Informativo: reporta misconfiguraciones de Dockerfile/compose/YAML.
+# DevSecOps no edita Docker: los hallazgos se entregan al equipo como issues.
+# NO marcar como required check.
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-config:
+    name: trivy-informativo
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Escaneo de configuracion
+        env:
+          TRIVY_IMAGE: aquasec/trivy:0.57.1
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            "$TRIVY_IMAGE" config /work \
+            --severity HIGH,CRITICAL \
+            --exit-code 0
