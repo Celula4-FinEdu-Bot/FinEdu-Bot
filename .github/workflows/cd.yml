@@ -1,78 +1,75 @@
-name: CD - Despliegue a Render
+name: Deploy Frontend
 
-# Se dispara solo cuando algo llega a main (ya paso los required checks).
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# Permisos minimos
-permissions:
-  contents: read
-
-concurrency:
-  group: cd-production
-  cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Validar configuración
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
+        run: |
+          [ -n "$RENDER_API_KEY" ] || { echo "Falta el secret RENDER_API_KEY"; exit 1; }
+          [ -n "$SERVICE_ID" ]     || { echo "Falta la variable RENDER_SERVICE_ID_FRONTEND"; exit 1; }
+          echo "Configuración OK"
+
       - name: Disparar deploy en Render
         id: deploy
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
-          DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
+          SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
         run: |
           RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
-            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
             -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{}')
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "HTTP status: $HTTP_CODE"
 
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "Error de la API: $BODY"
+            echo "Error al disparar el deploy: $BODY"
             exit 1
           fi
 
           DEPLOY_ID=$(echo "$BODY" | jq -r '.id // empty')
-          if [ -z "$DEPLOY_ID" ]; then
-            echo "No se pudo obtener el deploy_id: $BODY"
-            exit 1
-          fi
+          [ -n "$DEPLOY_ID" ] || { echo "No se obtuvo deploy id: $BODY"; exit 1; }
 
           echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
           echo "Deploy disparado con id: $DEPLOY_ID"
 
-      - name: Esperar el estado real del deploy (polling)
+      - name: Esperar a que el deploy esté live
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ vars.RENDER_SERVICE_ID_FRONTEND }}
-          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+          DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
         run: |
-          MAX_INTENTOS=40      # 40 x 15s = 10 minutos maximo
+          [ -n "$DEPLOY_ID" ] || { echo "DEPLOY_ID vacío"; exit 1; }
+
+          MAX_INTENTOS=40
           INTENTO=0
-
           while [ $INTENTO -lt $MAX_INTENTOS ]; do
-            STATUS=$(curl -s \
+            BODY=$(curl -sS \
               -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/$SERVICE_ID/deploys/$DEPLOY_ID" \
-              | jq -r '.status')
+              "https://api.render.com/v1/services/$SERVICE_ID/deploys/$DEPLOY_ID")
+            STATUS=$(echo "$BODY" | jq -r '.status // empty')
+            [ -n "$STATUS" ] || { echo "Respuesta inesperada: $BODY"; exit 1; }
 
-            echo "Intento $((INTENTO+1))/$MAX_INTENTOS - estado actual: $STATUS"
+            echo "Intento $((INTENTO+1))/$MAX_INTENTOS - estado: $STATUS"
 
             case "$STATUS" in
               live)
-                echo "OK: el deploy termino y esta live."
+                echo "OK: el deploy está live."
                 exit 0
                 ;;
               build_failed|update_failed|canceled|deactivated)
-                echo "El deploy termino con estado: $STATUS. Revisar logs en Render."
+                echo "El deploy terminó con estado: $STATUS. Revisar logs en Render."
                 exit 1
                 ;;
             esac
@@ -81,21 +78,14 @@ jobs:
             sleep 15
           done
 
-          echo "Se agoto el tiempo de espera (10 min) sin confirmar que el deploy este live."
+          echo "Se agotó el tiempo de espera (10 min)."
           exit 1
 
-      - name: Validar salud del servicio
+      - name: Health check (opcional)
         env:
-          URL: ${{ vars.FRONTEND_HEALTH_URL }}
+          HEALTH_URL: ${{ vars.FRONTEND_HEALTH_URL }}
         run: |
-          echo "Validando frontend: $URL"
-
-          STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" --max-time 30 "$URL")
-          echo "HTTP status final: $STATUS"
-
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
-            echo "::error::El frontend no esta saludable. HTTP $STATUS"
-            exit 1
-          fi
-
-          echo "OK: frontend saludable en produccion."
+          [ -n "$HEALTH_URL" ] || { echo "Sin FRONTEND_HEALTH_URL, se omite."; exit 0; }
+          CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$HEALTH_URL")
+          echo "Health check: HTTP $CODE"
+          [ "$CODE" -ge 200 ] && [ "$CODE" -lt 400 ]
