@@ -1,0 +1,295 @@
+
+/* Tarjetas de indicadores presupuestarios */
+
+.resumen-indicador {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resumen-indicador:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
+}
+
+
+.resumen-indicador .card-body {
+    padding: 1.5rem 0.4rem;
+}
+
+
+.resumen-indicador h6 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 1rem;
+}
+
+
+.resumen-indicador h4 {
+    font-size: clamp(0.8rem, 1.25vw, 1.1rem);
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.4;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+
+.resumen-indicador small {
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+/* Color distintivo por indicador */
+
+.resumen-pia {
+    border-top: 4px solid #4f46e5;
+}
+
+.resumen-pim {
+    border-top: 4px solid #0284c7;
+}
+
+.resumen-devengado {
+    border-top: 4px solid #059669;
+}
+
+.resumen-ejecucion {
+    border-top: 4px solid #d97706;
+}
+
+/* Adaptación a celulares */
+
+@media (max-width: 768px) {
+    .resumen-indicador h4 {
+        font-size: 1.1rem;
+    }
+}
+
+
+/* Buscador personalizado del MEF */
+
+.buscador-entidad {
+    position: relative;
+    width: 100%;
+}
+
+.buscador-entidad .form-control {
+    border-radius: 10px;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+}
+
+.buscador-entidad .form-control:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.lista-sugerencias {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    z-index: 1050;
+
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+
+    max-height: 260px;
+    overflow-y: auto;
+
+    padding: 6px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+
+.sugerencia-entidad {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+
+    background: #ffffff;
+    color: #334155;
+    border: none;
+    border-radius: 8px;
+
+    text-align: left;
+    font-size: 13px;
+    cursor: pointer;
+
+    transition: background 0.15s ease;
+}
+
+.sugerencia-entidad:hover,
+.sugerencia-entidad:focus-visible {
+    background: #eff6ff;
+    color: #1d4ed8;
+    outline: none;
+}
+
+
+/* =====================================
+   ENCABEZADO DEL MEF
+===================================== */
+
+.mef-encabezado {
+    background: linear-gradient(
+        120deg,
+        #102b50 0%,
+        #164b85 100%
+    );
+
+    color: white;
+    padding: 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 24px rgba(16, 43, 80, 0.14);
+}
+
+.mef-encabezado h2 {
+    font-size: clamp(1.5rem, 2.5vw, 2rem);
+    font-weight: 700;
+    margin: 12px 0;
+    color: #ffffff;
+}
+
+.mef-encabezado p {
+    color: #dbeafe;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 12px;
+    max-width: 750px;
+}
+
+.mef-encabezado small {
+    color: #cbd5e1;
+}
+
+.mef-etiqueta {
+    color: #93c5fd;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+/* =====================================
+   TARJETA DE FILTROS
+===================================== */
+
+.mef-tarjeta-filtros {
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+}
+
+.mef-tarjeta-filtros .card-body {
+    padding: 24px;
+}
+
+.mef-tarjeta-filtros h5 {
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.mef-tarjeta-filtros label {
+    color: #475569;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.mef-tarjeta-filtros .form-select {
+    border-radius: 10px;
+    min-height: 44px;
+    border-color: #cbd5e1;
+}
+
+/* =====================================
+   BOTÓN DE CONSULTA
+===================================== */
+
+.mef-boton-consulta {
+    background: #1769ca;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 24px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.mef-boton-consulta:hover {
+    background: #1155a6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(23, 105, 202, 0.20);
+}
+
+.mef-boton-consulta:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 3px;
+}
+
+/* =====================================
+   DISEÑO RESPONSIVE
+===================================== */
+
+@media (max-width: 768px) {
+    .mef-encabezado {
+        padding: 22px;
+    }
+
+    .mef-tarjeta-filtros .card-body {
+        padding: 18px;
+    }
+
+    .mef-boton-consulta {
+        width: 100%;
+    }
+}
+
+
+
+/* =====================================
+   RESUMEN PRESUPUESTARIO
+===================================== */
+
+.mef-resumen {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+}
+
+.mef-resumen > .card-header {
+    background: #ffffff;
+    border-bottom: 1px solid #edf2f7;
+    padding: 20px 24px;
+}
+
+.mef-resumen > .card-header h5 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.mef-resumen > .card-body {
+    padding: 24px;
+}
+
+@media (max-width: 768px) {
+    .mef-resumen > .card-header {
+        padding: 18px;
+    }
+
+    .mef-resumen > .card-body {
+        padding: 18px;
+    }
+}
