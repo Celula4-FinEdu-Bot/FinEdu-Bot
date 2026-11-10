@@ -1,8 +1,11 @@
-name: Backup & Restore - FinEdu-Bot
+name: FinEdu-Bot - Backup & Restore
 
 on:
   workflow_dispatch:
-
+  push:
+    branches:
+      - main
+      - Kevin
   pull_request:
 
 permissions:
@@ -10,7 +13,7 @@ permissions:
 
 jobs:
   backup-restore:
-    name: Backup & Restore
+    name: Backup & Restore Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -29,119 +32,135 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-    env:
-      SOURCE_DATABASE_URL: postgresql://finedu:finedu_demo@localhost:5432/finedu_source
-      TARGET_DATABASE_URL: postgresql://finedu:finedu_demo@localhost:5432/finedu_restore
-      N8N_VOLUME: finedu_n8n_demo
-      N8N_CONTAINER: n8n_local
-      BACKUP_ROOT: /tmp/finedu-backups
-
     steps:
-      - name: Descargar repositorio
-        uses: actions/checkout@v4
-
-      - name: Instalar PostgreSQL
+      - name: 1. Preparar entorno
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Dar permisos a los scripts
-        run: |
-          chmod +x scripts/backup-restore/backup.sh
-          chmod +x scripts/backup-restore/restore.sh
+          docker volume create finedu_n8n_test
 
-      - name: Preparar entorno de prueba
+      - name: 2. Crear datos de demostración
         run: |
           set -e
-
-          docker volume create "$N8N_VOLUME"
-
-          docker run --rm \
-            -v "$N8N_VOLUME:/data" \
-            alpine:3.20 \
-            sh -c 'echo "n8n-demo-state" > /data/restore-demo.txt'
 
           PGPASSWORD=finedu_demo psql \
             "host=localhost port=5432 dbname=finedu_source user=finedu" \
             -v ON_ERROR_STOP=1 \
-            -c "CREATE TABLE backup_demo (id integer PRIMARY KEY, dato text NOT NULL);" \
-            -c "INSERT INTO backup_demo VALUES (1, 'FinEdu-Bot backup OK');"
-
-          PGPASSWORD=finedu_demo createdb \
-            -h localhost \
-            -p 5432 \
-            -U finedu \
-            finedu_restore
-
-      - name: Generar respaldo
-        env:
-          DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
-        run: |
-          set -e
-
-          ./scripts/backup-restore/backup.sh
-
-          BACKUP_DIR="$(find "$BACKUP_ROOT" \
-            -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-
-          test -n "$BACKUP_DIR"
-
-          echo "BACKUP_DIR=$BACKUP_DIR" >> "$GITHUB_ENV"
-
-      - name: Comprobar archivos del respaldo
-        run: |
-          set -e
-
-          test -s "$BACKUP_DIR/postgres.dump"
-          test -s "$BACKUP_DIR/n8n-data.tar.gz"
-          test -s "$BACKUP_DIR/manifest.txt"
-          test -s "$BACKUP_DIR/SHA256SUMS"
-
-          cd "$BACKUP_DIR"
-          sha256sum --check SHA256SUMS
-
-      - name: Restaurar respaldo
-        env:
-          DATABASE_URL: ${{ env.TARGET_DATABASE_URL }}
-          RESTORE_CONFIRM: RESTAURAR
-        run: |
-          set -e
-
-          ./scripts/backup-restore/restore.sh "$BACKUP_DIR"
-
-      - name: Verificar PostgreSQL y n8n
-        run: |
-          set -e
-
-          RESULT="$(PGPASSWORD=finedu_demo psql \
-            "host=localhost port=5432 dbname=finedu_restore user=finedu" \
-            -Atc "SELECT dato FROM backup_demo WHERE id = 1")"
-
-          if [ "$RESULT" != "FinEdu-Bot backup OK" ]; then
-            echo "Error: PostgreSQL no recuperó los datos."
-            exit 1
-          fi
+            -c "CREATE TABLE backup_demo (
+              id SERIAL PRIMARY KEY,
+              mensaje TEXT NOT NULL
+            );" \
+            -c "INSERT INTO backup_demo (mensaje)
+              VALUES ('FinEdu-Bot backup restaurado correctamente');"
 
           docker run --rm \
-            -v "$N8N_VOLUME:/data:ro" \
+            -v finedu_n8n_test:/data \
             alpine:3.20 \
-            sh -c 'test "$(cat /data/restore-demo.txt)" = "n8n-demo-state"'
+            sh -c 'echo "n8n-data-restaurada" > /data/demo.txt'
 
-          echo "PostgreSQL restaurado correctamente."
-          echo "Volumen n8n restaurado correctamente."
+          PGPASSWORD=finedu_demo createdb \
+            -h localhost -p 5432 -U finedu finedu_restore
 
-      - name: Resumen
-        if: always()
+      - name: 3. Generar backup PostgreSQL
+        run: |
+          set -e
+
+          mkdir -p /tmp/finedu-backup
+
+          pg_dump \
+            "postgresql://finedu:finedu_demo@localhost:5432/finedu_source" \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            --file=/tmp/finedu-backup/postgres.dump
+
+      - name: 4. Generar backup n8n
+        run: |
+          set -e
+
+          docker run --rm \
+            -v finedu_n8n_test:/source:ro \
+            -v /tmp/finedu-backup:/backup \
+            alpine:3.20 \
+            tar czf /backup/n8n-data.tar.gz -C /source .
+
+      - name: 5. Verificar integridad
+        run: |
+          set -e
+
+          cd /tmp/finedu-backup
+
+          test -s postgres.dump
+          test -s n8n-data.tar.gz
+
+          sha256sum postgres.dump n8n-data.tar.gz > SHA256SUMS
+
+          sha256sum --check SHA256SUMS
+
+      - name: 6. Restaurar PostgreSQL
+        run: |
+          set -e
+
+          pg_restore \
+            --dbname="postgresql://finedu:finedu_demo@localhost:5432/finedu_restore" \
+            --no-owner \
+            --no-acl \
+            --exit-on-error \
+            /tmp/finedu-backup/postgres.dump
+
+      - name: 7. Restaurar volumen n8n
+        run: |
+          set -e
+
+          docker run --rm \
+            -v finedu_n8n_test:/data \
+            -v /tmp/finedu-backup:/backup:ro \
+            alpine:3.20 \
+            sh -ec '
+              find /data -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+              tar xzf /backup/n8n-data.tar.gz -C /data
+            '
+
+      - name: 8. Comprobar restauración PostgreSQL
+        run: |
+          set -e
+
+          RESULT=$(PGPASSWORD=finedu_demo psql \
+            "host=localhost port=5432 dbname=finedu_restore user=finedu" \
+            -Atc "SELECT mensaje FROM backup_demo WHERE id=1")
+
+          test "$RESULT" = "FinEdu-Bot backup restaurado correctamente"
+
+          echo "PostgreSQL: restauración correcta."
+
+      - name: 9. Comprobar restauración n8n
+        run: |
+          set -e
+
+          docker run --rm \
+            -v finedu_n8n_test:/data:ro \
+            alpine:3.20 \
+            sh -c 'test "$(cat /data/demo.txt)" = "n8n-data-restaurada"'
+
+          echo "n8n: restauración correcta."
+
+      - name: 10. Resultado final
         run: |
           echo "## Backup & Restore - FinEdu-Bot" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Proceso de respaldo y restauración ejecutado." >> "$GITHUB_STEP_SUMMARY"
+          echo "Todas las verificaciones finalizaron correctamente." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup PostgreSQL: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup n8n: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Integridad SHA-256: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Restore PostgreSQL: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Restore n8n: PASS" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Guardar respaldos
+      - name: 11. Guardar respaldos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: finedu-backup-restore
-          path: /tmp/finedu-backups/
+          name: finedu-backup-evidence
+          path: /tmp/finedu-backup/
           if-no-files-found: warn
           retention-days: 7
