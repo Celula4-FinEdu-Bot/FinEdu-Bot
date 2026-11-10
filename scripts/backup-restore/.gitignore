@@ -1,4 +1,3 @@
-# Los respaldos pueden contener datos y credenciales cifradas.
 *
 !.gitignore
 !.env.example

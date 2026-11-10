@@ -48,16 +48,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Ejecutar pruebas estáticas del backup
+      - name: Ejecutar pruebas estáticas
         run: |
-          chmod +x scripts/backup-restore/*.sh tests/backup-restore/*.sh
+          chmod +x scripts/backup-restore/*.sh
+          chmod +x tests/backup-restore/*.sh
           ./tests/backup-restore/backup-restore.test.sh
 
-      - name: Preparar entorno aislado de integración
+      - name: Preparar entorno de integración
         run: |
           set -euo pipefail
+
           docker volume create "$N8N_VOLUME"
-          docker run --rm -v "$N8N_VOLUME:/data" alpine:3.20 \
+
+          docker run --rm \
+            -v "$N8N_VOLUME:/data" \
+            alpine:3.20 \
             sh -c 'echo "n8n-demo-state" > /data/restore-demo.txt'
 
           PGPASSWORD=finedu_demo psql \
@@ -67,67 +72,86 @@ jobs:
             -c "INSERT INTO backup_demo VALUES (1, 'FinEdu-Bot backup OK');"
 
           PGPASSWORD=finedu_demo createdb \
-            -h localhost -p 5432 -U finedu finedu_restore
+            -h localhost \
+            -p 5432 \
+            -U finedu \
+            finedu_restore
 
-      - name: Generar respaldo de demostración
+      - name: Generar respaldo
         env:
           DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
         run: |
           set -euo pipefail
+
           ./scripts/backup-restore/backup.sh
-          BACKUP_DIR="$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+          BACKUP_DIR="$(find "$BACKUP_ROOT" \
+            -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
           test -n "$BACKUP_DIR"
+
           echo "BACKUP_DIR=$BACKUP_DIR" >> "$GITHUB_ENV"
 
-      - name: Comprobar integridad del respaldo
+      - name: Verificar integridad SHA-256
         run: |
           set -euo pipefail
+
           test -s "$BACKUP_DIR/postgres.dump"
           test -s "$BACKUP_DIR/n8n-data.tar.gz"
-          (cd "$BACKUP_DIR" && sha256sum --check SHA256SUMS)
+          test -s "$BACKUP_DIR/manifest.txt"
 
-      - name: Restaurar en base y volumen de prueba
+          cd "$BACKUP_DIR"
+          sha256sum --check SHA256SUMS
+
+      - name: Restaurar respaldo
         env:
           DATABASE_URL: ${{ env.TARGET_DATABASE_URL }}
           RESTORE_CONFIRM: RESTAURAR
         run: |
           set -euo pipefail
+
           ./scripts/backup-restore/restore.sh "$BACKUP_DIR"
 
-      - name: Verificar datos PostgreSQL y volumen n8n
+      - name: Verificar PostgreSQL y n8n
         run: |
           set -euo pipefail
-          result="$(PGPASSWORD=finedu_demo psql \
+
+          RESULT="$(PGPASSWORD=finedu_demo psql \
             "host=localhost port=5432 dbname=finedu_restore user=finedu" \
             -Atc "SELECT dato FROM backup_demo WHERE id = 1")"
-          test "$result" = "FinEdu-Bot backup OK"
 
-          docker run --rm -v "$N8N_VOLUME:/data:ro" alpine:3.20 \
+          test "$RESULT" = "FinEdu-Bot backup OK"
+
+          docker run --rm \
+            -v "$N8N_VOLUME:/data:ro" \
+            alpine:3.20 \
             sh -ec 'test "$(cat /data/restore-demo.txt)" = "n8n-demo-state"'
 
-          echo "PostgreSQL: restauración verificada."
-          echo "n8n: volumen restaurado y verificado."
+          echo "PostgreSQL restaurado correctamente."
+          echo "Volumen n8n restaurado correctamente."
 
-      - name: Resumen final de validaciones
+      - name: Resumen final
         if: always()
         run: |
           {
             echo "## Backup & Restore - FinEdu-Bot"
             echo ""
-            echo "- Prueba estática: revisa el check del paso correspondiente."
-            echo "- Backup PostgreSQL: revisa el check del paso correspondiente."
-            echo "- Backup del volumen n8n: revisa el check del paso correspondiente."
-            echo "- Integridad SHA-256: revisa el check del paso correspondiente."
-            echo "- Restore PostgreSQL y n8n: revisa el check del paso correspondiente."
-            echo ""
+
             if [[ "${{ job.status }}" == "success" ]]; then
-              echo "### ✅ Resultado: todas las pruebas finalizaron correctamente."
+              echo "### ✅ TODAS LAS PRUEBAS APROBADAS"
+              echo "- Scripts validados"
+              echo "- Backup PostgreSQL"
+              echo "- Backup volumen n8n"
+              echo "- Integridad SHA-256"
+              echo "- Restauración PostgreSQL"
+              echo "- Restauración n8n"
             else
-              echo "### ❌ Resultado: una o más pruebas fallaron. Revisa el paso marcado en rojo."
+              echo "### ❌ ERROR EN UNA O MÁS PRUEBAS"
+              echo "Revisar los pasos marcados en rojo."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publicar evidencia del respaldo de demostración
+      - name: Guardar evidencia
         if: always()
         uses: actions/upload-artifact@v4
         with:
