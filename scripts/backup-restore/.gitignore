@@ -1,4 +1,7 @@
-.env
-backups/
-*.tar.gz
-*.enc
+# Los respaldos pueden contener datos y credenciales cifradas.
+*
+!.gitignore
+!.env.example
+!README.md
+!backup.sh
+!restore.sh
