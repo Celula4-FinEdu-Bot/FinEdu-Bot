@@ -1,4 +1,6 @@
-.env
-backups/
-*.tar.gz
-*.enc
+*
+!.gitignore
+!.env.example
+!README.md
+!backup.sh
+!restore.sh
