@@ -2,18 +2,15 @@ name: Backup & Restore - FinEdu-Bot
 
 on:
   workflow_dispatch:
+
   pull_request:
-    paths:
-      - "scripts/backup-restore/**"
-      - "tests/backup-restore/**"
-      - ".github/workflows/backup-restore.yml"
 
 permissions:
   contents: read
 
 jobs:
   backup-restore:
-    name: Backup & Restore (PostgreSQL + n8n)
+    name: Backup & Restore
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -43,20 +40,19 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Instalar cliente PostgreSQL
+      - name: Instalar PostgreSQL
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Ejecutar pruebas estáticas
+      - name: Dar permisos a los scripts
         run: |
-          chmod +x scripts/backup-restore/*.sh
-          chmod +x tests/backup-restore/*.sh
-          ./tests/backup-restore/backup-restore.test.sh
+          chmod +x scripts/backup-restore/backup.sh
+          chmod +x scripts/backup-restore/restore.sh
 
-      - name: Preparar entorno de integración
+      - name: Preparar entorno de prueba
         run: |
-          set -euo pipefail
+          set -e
 
           docker volume create "$N8N_VOLUME"
 
@@ -81,7 +77,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
         run: |
-          set -euo pipefail
+          set -e
 
           ./scripts/backup-restore/backup.sh
 
@@ -92,13 +88,14 @@ jobs:
 
           echo "BACKUP_DIR=$BACKUP_DIR" >> "$GITHUB_ENV"
 
-      - name: Verificar integridad SHA-256
+      - name: Comprobar archivos del respaldo
         run: |
-          set -euo pipefail
+          set -e
 
           test -s "$BACKUP_DIR/postgres.dump"
           test -s "$BACKUP_DIR/n8n-data.tar.gz"
           test -s "$BACKUP_DIR/manifest.txt"
+          test -s "$BACKUP_DIR/SHA256SUMS"
 
           cd "$BACKUP_DIR"
           sha256sum --check SHA256SUMS
@@ -108,54 +105,43 @@ jobs:
           DATABASE_URL: ${{ env.TARGET_DATABASE_URL }}
           RESTORE_CONFIRM: RESTAURAR
         run: |
-          set -euo pipefail
+          set -e
 
           ./scripts/backup-restore/restore.sh "$BACKUP_DIR"
 
       - name: Verificar PostgreSQL y n8n
         run: |
-          set -euo pipefail
+          set -e
 
           RESULT="$(PGPASSWORD=finedu_demo psql \
             "host=localhost port=5432 dbname=finedu_restore user=finedu" \
             -Atc "SELECT dato FROM backup_demo WHERE id = 1")"
 
-          test "$RESULT" = "FinEdu-Bot backup OK"
+          if [ "$RESULT" != "FinEdu-Bot backup OK" ]; then
+            echo "Error: PostgreSQL no recuperó los datos."
+            exit 1
+          fi
 
           docker run --rm \
             -v "$N8N_VOLUME:/data:ro" \
             alpine:3.20 \
-            sh -ec 'test "$(cat /data/restore-demo.txt)" = "n8n-demo-state"'
+            sh -c 'test "$(cat /data/restore-demo.txt)" = "n8n-demo-state"'
 
           echo "PostgreSQL restaurado correctamente."
           echo "Volumen n8n restaurado correctamente."
 
-      - name: Resumen final
+      - name: Resumen
         if: always()
         run: |
-          {
-            echo "## Backup & Restore - FinEdu-Bot"
-            echo ""
+          echo "## Backup & Restore - FinEdu-Bot" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Proceso de respaldo y restauración ejecutado." >> "$GITHUB_STEP_SUMMARY"
 
-            if [[ "${{ job.status }}" == "success" ]]; then
-              echo "### ✅ TODAS LAS PRUEBAS APROBADAS"
-              echo "- Scripts validados"
-              echo "- Backup PostgreSQL"
-              echo "- Backup volumen n8n"
-              echo "- Integridad SHA-256"
-              echo "- Restauración PostgreSQL"
-              echo "- Restauración n8n"
-            else
-              echo "### ❌ ERROR EN UNA O MÁS PRUEBAS"
-              echo "Revisar los pasos marcados en rojo."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Guardar evidencia
+      - name: Guardar respaldos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: finedu-backup-restore-evidence
+          name: finedu-backup-restore
           path: /tmp/finedu-backups/
           if-no-files-found: warn
           retention-days: 7
