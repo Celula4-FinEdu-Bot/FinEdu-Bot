@@ -5,6 +5,9 @@ on:
     - cron: "0 5 * * *" # 05:00 UTC = 00:00 hora Lima
   workflow_dispatch: # permite ejecutarlo manualmente desde la pestaña Actions
 
+permissions:
+  contents: read
+
 jobs:
   backup:
     # Debe correr en el servidor donde están los contenedores (runner propio con Docker)
